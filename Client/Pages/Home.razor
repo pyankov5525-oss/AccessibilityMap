@@ -4,39 +4,39 @@
 @inject NavigationManager Navigation
 @implements IDisposable
 
-<div class="page">
-    <div class="toolbar">
-        <div class="filters">
-            <button class="chip @(currentFilter == "all" ? "chip-active" : "")" @onclick="SetFilterAll">Все</button>
-            <button class="chip chip-green @(currentFilter == "green" ? "chip-active" : "")" @onclick="SetFilterGreen">🟢 Доступно</button>
-            <button class="chip chip-gold @(currentFilter == "gold" ? "chip-active" : "")" @onclick="SetFilterGold">🟡 Частично</button>
-            <button class="chip chip-red @(currentFilter == "red" ? "chip-active" : "")" @onclick="SetFilterRed">🔴 Недоступно</button>
-        </div>
+<div class="map-page">
+    <div id="map" class="map"></div>
 
-        @if (showCounter)
-        {
-            <div class="stats">
-                <div class="stat"><b>@totalCount</b><span>всего</span></div>
-                <div class="stat stat-green"><b>@greenCount</b><span>доступно</span></div>
-                <div class="stat stat-gold"><b>@goldCount</b><span>частично</span></div>
-                <div class="stat stat-red"><b>@redCount</b><span>недоступно</span></div>
-            </div>
-        }
+    @* Фильтры — накладываются поверх карты (по центру сверху) *@
+    <div class="map-filters">
+        <button class="chip @(currentFilter == "all" ? "chip-active" : "")" @onclick="SetFilterAll">Все</button>
+        <button class="chip chip-green @(currentFilter == "green" ? "chip-active" : "")" @onclick="SetFilterGreen">🟢 Доступно</button>
+        <button class="chip chip-gold @(currentFilter == "gold" ? "chip-active" : "")" @onclick="SetFilterGold">🟡 Частично</button>
+        <button class="chip chip-red @(currentFilter == "red" ? "chip-active" : "")" @onclick="SetFilterRed">🔴 Недоступно</button>
     </div>
+
+    @* Кнопка добавления — поверх карты (справа сверху) *@
+    <button class="map-add-btn" @onclick="StartAdd">➕ Добавить объект</button>
+
+    @if (showCounter)
+    {
+        <div class="map-stats">
+            <div class="stat"><b>@totalCount</b><span>всего</span></div>
+            <div class="stat stat-green"><b>@greenCount</b><span>доступно</span></div>
+            <div class="stat stat-gold"><b>@goldCount</b><span>частично</span></div>
+            <div class="stat stat-red"><b>@redCount</b><span>недоступно</span></div>
+        </div>
+    }
 
     @if (accessibilityMode)
     {
-        <div class="mode-banner">♿ Режим доступности включён — кликните по карте, чтобы добавить объект</div>
+        <div class="map-banner">♿ Режим доступности включён — кликните по карте, чтобы добавить объект. Ещё раз нажмите «➕ Добавить объект», чтобы выйти.</div>
     }
 
-    <div class="map-layout @(showForm ? "with-form" : "")">
-        <div class="map-col">
-            <div id="map" class="map"></div>
-        </div>
-
-        @if (showForm)
-        {
-            <aside class="form-card">
+    @if (showForm)
+    {
+        <div class="map-form-overlay">
+            <div class="form-card">
                 <h5 class="form-title">@(editingId.HasValue ? "Редактировать объект" : "Добавить объект")</h5>
 
                 <div class="field">
@@ -73,6 +73,17 @@
                 <ScoreInput Label="Персонал" @bind-value="newPlacemark.ScoreStaff" />
 
                 <div class="field">
+                    <label class="form-label">Фотография:</label>
+                    <InputFile OnChange="OnFileSelected" accept="image/*" />
+                    @if (!string.IsNullOrEmpty(newPlacemark.PhotoPath))
+                    {
+                        <div class="photo-preview">
+                            <img src="/uploads/@newPlacemark.PhotoPath" alt="фото объекта" />
+                        </div>
+                    }
+                </div>
+
+                <div class="field">
                     <label class="form-label">Примечания:</label>
                     <textarea @bind="newPlacemark.Notes" class="form-control" rows="2"></textarea>
                 </div>
@@ -86,9 +97,9 @@
                 {
                     <div class="alert @(isError ? "alert-danger" : "alert-success")">@message</div>
                 }
-            </aside>
-        }
-    </div>
+            </div>
+        </div>
+    }
 </div>
 
 @code {
@@ -109,6 +120,8 @@
 
     private string currentFilter = "all";
 
+    private const long MaxPhotoSize = 5 * 1024 * 1024;
+
     private async Task SetFilterAll() => await SetFilter("all");
     private async Task SetFilterGreen() => await SetFilter("green");
     private async Task SetFilterGold() => await SetFilter("gold");
@@ -119,6 +132,9 @@
         currentFilter = filter;
         await JS.InvokeVoidAsync("setFilter", filter);
     }
+
+    // Включает/выключает «режим доступности» (добавление объекта кликом по карте)
+    private async Task StartAdd() => await JS.InvokeVoidAsync("toggleAccessibilityMode");
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -221,7 +237,8 @@
                     ScoreInfo = placemark.Scores?.Info ?? 0,
                     ScoreParking = placemark.Scores?.Parking ?? 0,
                     ScoreStaff = placemark.Scores?.Staff ?? 0,
-                    Notes = placemark.Notes
+                    Notes = placemark.Notes,
+                    PhotoPath = placemark.PhotoPath ?? ""
                 };
                 showForm = true;
                 message = "";
@@ -306,12 +323,40 @@
         await JS.InvokeVoidAsync("updatePlacemarks", placemarks ?? new List<PlacemarkData>());
     }
 
-    private void CloseForm()
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
     {
-        showForm = false;
-        editingId = null;
-        newPlacemark = new NewPlacemark();
-        message = "";
+        var file = e.File;
+        if (file == null) return;
+
+        try
+        {
+            await using var ms = new MemoryStream();
+            await file.OpenReadStream(MaxPhotoSize).CopyToAsync(ms);
+
+            var content = new MultipartFormDataContent();
+            content.Add(new ByteArrayContent(ms.ToArray()), "file", file.Name);
+
+            var response = await Http.PostAsync("/api/photos", content);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<PhotoUploadResult>();
+                newPlacemark.PhotoPath = result?.FileName ?? "";
+                message = "Фото загружено ✅";
+                isError = false;
+            }
+            else
+            {
+                message = "Не удалось загрузить фото";
+                isError = true;
+            }
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            message = "Ошибка загрузки фото: " + ex.Message;
+            isError = true;
+            StateHasChanged();
+        }
     }
 
     private async Task AddPlacemark()
@@ -360,6 +405,11 @@
         public string Address { get; set; } = "";
     }
 
+    public class PhotoUploadResult
+    {
+        public string FileName { get; set; } = "";
+    }
+
     public class PlacemarkData
     {
         public int Id { get; set; }
@@ -372,6 +422,8 @@
         public string Level { get; set; } = "";
         public int TotalScore { get; set; }
         public string Notes { get; set; } = "";
+        public string? PhotoUrl { get; set; }
+        public string? PhotoPath { get; set; }
         public PlacemarkScores? Scores { get; set; }
     }
 
@@ -401,5 +453,6 @@
         public int ScoreParking { get; set; }
         public int ScoreStaff { get; set; }
         public string Notes { get; set; } = "";
+        public string PhotoPath { get; set; } = "";
     }
 }

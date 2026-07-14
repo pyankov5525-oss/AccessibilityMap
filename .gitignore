@@ -9,6 +9,10 @@ obj/
 *.db-shm
 *.db-wal
 
+# Uploaded object photos (runtime data)
+Server/wwwroot/uploads/
+**/wwwroot/uploads/
+
 # Rider / VS
 .idea/
 .vs/

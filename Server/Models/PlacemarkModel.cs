@@ -51,5 +51,6 @@ public class PlacemarkModel
     };
 
     public string Notes { get; set; } = string.Empty;
+    public string? PhotoPath { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

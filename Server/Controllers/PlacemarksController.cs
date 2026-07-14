@@ -3,7 +3,9 @@ using Microsoft.EntityFrameworkCore;
 using AccessibilityMap.Server.Data;
 using AccessibilityMap.Server.Models;
 using Microsoft.Extensions.Http;
+using Microsoft.AspNetCore.Hosting;
 using System.Globalization;
+using System.IO;
 
 namespace AccessibilityMap.Server.Controllers;
 
@@ -14,14 +16,16 @@ public class PlacemarksController : ControllerBase
     private readonly AppDbContext _db;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<PlacemarksController> _logger;
+    private readonly IWebHostEnvironment _env;
     private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
     private const string GeocoderApiKey = "36a55651-ec1b-4152-bbf5-1875ec574586";
 
-    public PlacemarksController(AppDbContext db, IHttpClientFactory httpClientFactory, ILogger<PlacemarksController> logger)
+    public PlacemarksController(AppDbContext db, IHttpClientFactory httpClientFactory, ILogger<PlacemarksController> logger, IWebHostEnvironment env)
     {
         _db = db;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
+        _env = env;
     }
 
     [HttpGet]
@@ -104,6 +108,7 @@ public class PlacemarksController : ControllerBase
         placemark.ScoreParking = updated.ScoreParking;
         placemark.ScoreStaff = updated.ScoreStaff;
         placemark.Notes = updated.Notes;
+        placemark.PhotoPath = updated.PhotoPath;
 
         await _db.SaveChangesAsync();
         return Ok(ToDto(placemark));
@@ -179,6 +184,32 @@ public class PlacemarksController : ControllerBase
         return Ok(new { address = "Адрес не найден" });
     }
 
+    [HttpPost("/api/photos")]
+    public async Task<IActionResult> UploadPhoto(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest(new { error = "Файл не выбран" });
+        }
+
+        var allowed = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+        var ext = Path.GetExtension(file.FileName);
+        if (!allowed.Contains(ext, StringComparer.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { error = "Недопустимый тип файла (только изображения)" });
+        }
+
+        var uploads = Path.Combine(_env.WebRootPath, "uploads");
+        Directory.CreateDirectory(uploads);
+
+        var fileName = Guid.NewGuid().ToString("N") + ext;
+        var fullPath = Path.Combine(uploads, fileName);
+        await using var stream = System.IO.File.Create(fullPath);
+        await file.CopyToAsync(stream);
+
+        return Ok(new { fileName });
+    }
+
     private static object ToDto(PlacemarkModel p) => new
     {
         p.Id,
@@ -191,6 +222,8 @@ public class PlacemarksController : ControllerBase
         p.Level,
         p.TotalScore,
         p.Notes,
+        PhotoUrl = string.IsNullOrEmpty(p.PhotoPath) ? null : "/uploads/" + p.PhotoPath,
+        PhotoPath = p.PhotoPath,
         Scores = new
         {
             Entrance = p.ScoreEntrance,

@@ -202,3 +202,123 @@ h1, h2, h3, h4, h5, h6 { margin: 0 0 8px; font-weight: 600; }
 .level-red { background: rgba(239,68,68,.18); color: var(--red); }
 
 .row-actions { display: flex; gap: 6px; }
+
+/* ============================================================
+   Полноэкранная карта: всё управление — поверх карты (оверлеи)
+   ============================================================ */
+.map-page {
+  position: relative;
+  width: 100%;
+  height: calc(100vh - 80px);
+}
+.map {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+
+/* Фильтры по центру сверху */
+.map-filters {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 90%;
+  padding: 6px;
+  border-radius: 12px;
+  background: rgba(22, 28, 36, .85);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
+}
+
+/* Кнопка добавления справа сверху */
+.map-add-btn {
+  position: absolute;
+  top: 84px;
+  right: 12px;
+  z-index: 10;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--accent);
+  background: rgba(59, 130, 246, .92);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
+}
+.map-add-btn:hover { background: var(--accent); }
+
+/* Статистика слева снизу */
+.map-stats {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 10;
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 12px;
+  background: rgba(22, 28, 36, .85);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
+}
+
+/* Баннер режима доступности по центру снизу */
+.map-banner {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  max-width: 90%;
+  text-align: center;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: rgba(59, 130, 246, .92);
+  color: #fff;
+  font-size: 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
+}
+
+/* Форма добавления/редактирования — справа поверх карты */
+.map-form-overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 400px;
+  max-width: 92%;
+  z-index: 20;
+  padding: 12px;
+  overflow: auto;
+  background: rgba(15, 20, 25, .55);
+  backdrop-filter: blur(2px);
+}
+.map-form-overlay .form-card {
+  height: 100%;
+  max-height: none;
+}
+
+.photo-preview img {
+  display: block;
+  max-width: 100%;
+  border-radius: 8px;
+  margin-top: 6px;
+  border: 1px solid var(--border);
+}
+
+@media (max-width: 900px) {
+  .map-page { height: calc(100vh - 76px); }
+  .map-form-overlay { width: 100%; max-width: 100%; }
+}

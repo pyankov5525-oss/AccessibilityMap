@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using AccessibilityMap.Server.Data;
+using System.IO;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,6 +21,13 @@ builder.Services.AddCors(options =>
               .AllowAnyMethod();
     });
 });
+
+// На хостинге (Render/Azure) порт задаётся переменной окружения PORT (Render) / WEBSITES_PORT (Azure).
+var port = Environment.GetEnvironmentVariable("PORT") ?? Environment.GetEnvironmentVariable("WEBSITES_PORT");
+if (!string.IsNullOrEmpty(port))
+{
+    Environment.SetEnvironmentVariable("ASPNETCORE_URLS", $"http://*:{port}");
+}
 
 var app = builder.Build();
 
@@ -42,5 +50,8 @@ using (var scope = app.Services.CreateScope())
     db.Database.EnsureCreated();
     await DbInitializer.SeedAsync(db);
 }
+
+// Папка для загруженных фотографий объектов
+Directory.CreateDirectory(Path.Combine(app.Environment.WebRootPath, "uploads"));
 
 app.Run();
