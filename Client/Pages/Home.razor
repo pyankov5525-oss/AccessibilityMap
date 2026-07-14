@@ -395,6 +395,14 @@
         }
     }
 
+    private void CloseForm()
+    {
+        showForm = false;
+        editingId = null;
+        newPlacemark = new NewPlacemark();
+        message = "";
+    }
+
     public void Dispose()
     {
         dotNetRef?.Dispose();
