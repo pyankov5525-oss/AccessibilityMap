@@ -199,7 +199,7 @@ public class PlacemarksController : ControllerBase
             return BadRequest(new { error = "Недопустимый тип файла (только изображения)" });
         }
 
-        var uploads = Path.Combine(_env.WebRootPath, "uploads");
+        var uploads = Path.Combine(_env.ContentRootPath, "uploads");
         Directory.CreateDirectory(uploads);
 
         var fileName = Guid.NewGuid().ToString("N") + ext;
@@ -208,6 +208,35 @@ public class PlacemarksController : ControllerBase
         await file.CopyToAsync(stream);
 
         return Ok(new { fileName });
+    }
+
+    [HttpGet("/api/photos/{fileName}")]
+    public IActionResult GetPhoto(string fileName)
+    {
+        fileName = Path.GetFileName(fileName);
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return BadRequest(new { error = "Некорректное имя файла" });
+        }
+
+        var uploads = Path.Combine(_env.ContentRootPath, "uploads");
+        var fullPath = Path.Combine(uploads, fileName);
+        if (!System.IO.File.Exists(fullPath))
+        {
+            return NotFound();
+        }
+
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+        var contentType = ext switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".gif" => "image/gif",
+            ".webp" => "image/webp",
+            _ => "application/octet-stream"
+        };
+
+        return PhysicalFile(fullPath, contentType);
     }
 
     private static object ToDto(PlacemarkModel p) => new
@@ -222,7 +251,7 @@ public class PlacemarksController : ControllerBase
         p.Level,
         p.TotalScore,
         p.Notes,
-        PhotoUrl = string.IsNullOrEmpty(p.PhotoPath) ? null : "/uploads/" + p.PhotoPath,
+        PhotoUrl = string.IsNullOrEmpty(p.PhotoPath) ? null : "/api/photos/" + p.PhotoPath,
         PhotoPath = p.PhotoPath,
         Scores = new
         {

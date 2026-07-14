@@ -10,8 +10,8 @@ obj/
 *.db-wal
 
 # Uploaded object photos (runtime data)
-Server/wwwroot/uploads/
-**/wwwroot/uploads/
+Server/uploads/
+**/uploads/
 
 # Rider / VS
 .idea/

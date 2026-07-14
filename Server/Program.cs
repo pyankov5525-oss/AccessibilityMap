@@ -51,7 +51,7 @@ using (var scope = app.Services.CreateScope())
     await DbInitializer.SeedAsync(db);
 }
 
-// Папка для загруженных фотографий объектов
-Directory.CreateDirectory(Path.Combine(app.Environment.WebRootPath, "uploads"));
+// Папка для загруженных фотографий объектов (вне wwwroot, отдаётся через API)
+Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "uploads"));
 
 app.Run();
