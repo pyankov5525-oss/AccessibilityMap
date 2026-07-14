@@ -181,6 +181,13 @@
             }
         }
 
+        function moveMapTo(lat, lon) {
+            if (map) {
+                map.balloon.close();
+                map.setCenter([lat, lon], 16, { duration: 300 });
+            }
+        }
+
         function deletePlacemark(id) {
             if (confirm('Удалить этот объект?')) {
                 var pm = placemarkObjects[id];

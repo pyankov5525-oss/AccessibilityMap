@@ -1,0 +1,144 @@
+@page "/places"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Список объектов</PageTitle>
+
+<div class="page">
+    <div class="places-header">
+        <h1>Список объектов</h1>
+        <a class="btn btn-secondary" href="">← На карту</a>
+    </div>
+
+    <div class="toolbar">
+        <div class="filters">
+            <button class="chip @(filter == "all" ? "chip-active" : "")" @onclick="@(() => SetFilter("all"))">Все</button>
+            <button class="chip chip-green @(filter == "green" ? "chip-active" : "")" @onclick="@(() => SetFilter("green"))">🟢 Доступно</button>
+            <button class="chip chip-gold @(filter == "gold" ? "chip-active" : "")" @onclick="@(() => SetFilter("gold"))">🟡 Частично</button>
+            <button class="chip chip-red @(filter == "red" ? "chip-active" : "")" @onclick="@(() => SetFilter("red"))">🔴 Недоступно</button>
+        </div>
+        <input class="form-control search-box" placeholder="Поиск по названию или адресу..."
+               @bind="search" @oninput="OnSearchInput" />
+    </div>
+
+    @if (loading)
+    {
+        <p class="muted">Загрузка...</p>
+    }
+    else if (filtered.Count == 0)
+    {
+        <p class="muted">Объекты не найдены.</p>
+    }
+    else
+    {
+        <table class="places-table">
+            <thead>
+                <tr>
+                    <th>Название</th>
+                    <th>Категория</th>
+                    <th>Адрес</th>
+                    <th>Баллы</th>
+                    <th>Уровень</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in filtered)
+                {
+                    <tr>
+                        <td>@p.Name</td>
+                        <td>@p.Category</td>
+                        <td class="muted">@p.Address</td>
+                        <td>@p.TotalScore / 21</td>
+                        <td><span class="level-badge level-@p.Level">@p.LevelText</span></td>
+                        <td class="row-actions">
+                            <button class="btn btn-sm btn-secondary" @onclick="@(() => Edit(p.Id))">Изменить</button>
+                            <button class="btn btn-sm btn-danger" @onclick="@(() => Delete(p.Id))">Удалить</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private class PlacemarkDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public string Address { get; set; } = "";
+        public string Category { get; set; } = "";
+        public string Level { get; set; } = "";
+        public string LevelText { get; set; } = "";
+        public int TotalScore { get; set; }
+    }
+
+    private List<PlacemarkDto> all = new();
+    private List<PlacemarkDto> filtered = new();
+    private string filter = "all";
+    private string search = "";
+    private bool loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        loading = true;
+        try
+        {
+            all = await Http.GetFromJsonAsync<List<PlacemarkDto>>("/api/placemarks") ?? new List<PlacemarkDto>();
+        }
+        catch
+        {
+            all = new List<PlacemarkDto>();
+        }
+
+        Apply();
+        loading = false;
+        StateHasChanged();
+    }
+
+    private void SetFilter(string f)
+    {
+        filter = f;
+        Apply();
+    }
+
+    private void OnSearchInput(ChangeEventArgs e)
+    {
+        search = e.Value?.ToString() ?? "";
+        Apply();
+    }
+
+    private void Apply()
+    {
+        var q = search.Trim().ToLowerInvariant();
+        filtered = all.Where(p =>
+            (filter == "all" || p.Level == filter) &&
+            (string.IsNullOrEmpty(q) ||
+             p.Name.ToLowerInvariant().Contains(q) ||
+             p.Address.ToLowerInvariant().Contains(q))
+        ).ToList();
+    }
+
+    private void Edit(int id)
+    {
+        Navigation.NavigateTo("/?edit=" + id);
+    }
+
+    private async Task Delete(int id)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", "Удалить объект?"))
+        {
+            return;
+        }
+
+        await Http.DeleteAsync("/api/placemarks/" + id);
+        await Load();
+    }
+}

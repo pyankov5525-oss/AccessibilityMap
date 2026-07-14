@@ -1,68 +1,94 @@
-﻿@page "/"
+@page "/"
 @inject HttpClient Http
 @inject IJSRuntime JS
+@inject NavigationManager Navigation
 @implements IDisposable
 
-<div style="display: flex; gap: 30px;">
-    <div style="width: @(showForm ? "60%" : "100%");">
-        <div style="width: 100%; height: 600px; border-radius: 12px; overflow: hidden;" id="map"></div>
+<div class="page">
+    <div class="toolbar">
+        <div class="filters">
+            <button class="chip @(currentFilter == "all" ? "chip-active" : "")" @onclick="SetFilterAll">Все</button>
+            <button class="chip chip-green @(currentFilter == "green" ? "chip-active" : "")" @onclick="SetFilterGreen">🟢 Доступно</button>
+            <button class="chip chip-gold @(currentFilter == "gold" ? "chip-active" : "")" @onclick="SetFilterGold">🟡 Частично</button>
+            <button class="chip chip-red @(currentFilter == "red" ? "chip-active" : "")" @onclick="SetFilterRed">🔴 Недоступно</button>
+        </div>
+
+        @if (showCounter)
+        {
+            <div class="stats">
+                <div class="stat"><b>@totalCount</b><span>всего</span></div>
+                <div class="stat stat-green"><b>@greenCount</b><span>доступно</span></div>
+                <div class="stat stat-gold"><b>@goldCount</b><span>частично</span></div>
+                <div class="stat stat-red"><b>@redCount</b><span>недоступно</span></div>
+            </div>
+        }
     </div>
 
-    @if (showForm)
+    @if (accessibilityMode)
     {
-        <div style="width: 40%;">
-            <h5 style="color: #fff; margin-bottom: 15px;">@(editingId.HasValue ? "Редактировать объект" : "Добавить объект")</h5>
-
-            <div style="margin-bottom: 12px;">
-                <label style="color: #aaa; font-size: 13px;">Адрес:</label>
-                <input @bind="newPlacemark.Address" class="form-control" placeholder="ул. Ленина, 10, Воронеж"
-                       style="background: #2a2a2a; border: 1px solid #444; color: #fff;" />
-            </div>
-
-            <div style="margin-bottom: 12px;">
-                <label style="color: #aaa; font-size: 13px;">Название:</label>
-                <input @bind="newPlacemark.Name" class="form-control" style="background: #2a2a2a; border: 1px solid #444; color: #fff;" />
-            </div>
-
-            <div style="margin-bottom: 12px;">
-                <label style="color: #aaa; font-size: 13px;">Категория:</label>
-                <select @bind="newPlacemark.Category" class="form-control" style="background: #2a2a2a; border: 1px solid #444; color: #fff;">
-                    <option value="">Выберите...</option>
-                    <option>Поликлиника</option>
-                    <option>Аптека</option>
-                    <option>Магазин</option>
-                    <option>Администрация</option>
-                    <option>Культура</option>
-                    <option>Образование</option>
-                    <option>Другое</option>
-                </select>
-            </div>
-
-            <h6 style="color: #ccc; margin-top: 15px;">Критерии (0-3):</h6>
-            <ScoreInput Label="Вход" @bind-value="newPlacemark.ScoreEntrance" />
-            <ScoreInput Label="Ширина дверей" @bind-value="newPlacemark.ScoreDoorWidth" />
-            <ScoreInput Label="Внутренние пути" @bind-value="newPlacemark.ScoreInternalPath" />
-            <ScoreInput Label="Санитарная зона" @bind-value="newPlacemark.ScoreSanitary" />
-            <ScoreInput Label="Информация" @bind-value="newPlacemark.ScoreInfo" />
-            <ScoreInput Label="Парковка" @bind-value="newPlacemark.ScoreParking" />
-            <ScoreInput Label="Персонал" @bind-value="newPlacemark.ScoreStaff" />
-
-            <div style="margin-bottom: 12px; margin-top: 12px;">
-                <label style="color: #aaa; font-size: 13px;">Примечания:</label>
-                <textarea @bind="newPlacemark.Notes" class="form-control" style="background: #2a2a2a; border: 1px solid #444; color: #fff;" rows="2"></textarea>
-            </div>
-
-            <div style="display: flex; gap: 10px;">
-                <button class="btn btn-success" @onclick="AddPlacemark" style="flex: 1;">@(editingId.HasValue ? "Сохранить" : "Добавить")</button>
-                <button class="btn btn-secondary" @onclick="CloseForm" style="flex: 1;">Отмена</button>
-            </div>
-
-            @if (!string.IsNullOrEmpty(message))
-            {
-                <div class="alert @(isError ? "alert-danger" : "alert-success") mt-2" style="font-size: 13px; padding: 8px;">@message</div>
-            }
-        </div>
+        <div class="mode-banner">♿ Режим доступности включён — кликните по карте, чтобы добавить объект</div>
     }
+
+    <div class="map-layout @(showForm ? "with-form" : "")">
+        <div class="map-col">
+            <div id="map" class="map"></div>
+        </div>
+
+        @if (showForm)
+        {
+            <aside class="form-card">
+                <h5 class="form-title">@(editingId.HasValue ? "Редактировать объект" : "Добавить объект")</h5>
+
+                <div class="field">
+                    <label class="form-label">Адрес:</label>
+                    <input @bind="newPlacemark.Address" class="form-control" placeholder="ул. Ленина, 10, Воронеж" />
+                </div>
+
+                <div class="field">
+                    <label class="form-label">Название:</label>
+                    <input @bind="newPlacemark.Name" class="form-control" />
+                </div>
+
+                <div class="field">
+                    <label class="form-label">Категория:</label>
+                    <select @bind="newPlacemark.Category" class="form-control">
+                        <option value="">Выберите...</option>
+                        <option>Поликлиника</option>
+                        <option>Аптека</option>
+                        <option>Магазин</option>
+                        <option>Администрация</option>
+                        <option>Культура</option>
+                        <option>Образование</option>
+                        <option>Другое</option>
+                    </select>
+                </div>
+
+                <h6 class="criteria-title">Критерии (0-3):</h6>
+                <ScoreInput Label="Вход" @bind-value="newPlacemark.ScoreEntrance" />
+                <ScoreInput Label="Ширина дверей" @bind-value="newPlacemark.ScoreDoorWidth" />
+                <ScoreInput Label="Внутренние пути" @bind-value="newPlacemark.ScoreInternalPath" />
+                <ScoreInput Label="Санитарная зона" @bind-value="newPlacemark.ScoreSanitary" />
+                <ScoreInput Label="Информация" @bind-value="newPlacemark.ScoreInfo" />
+                <ScoreInput Label="Парковка" @bind-value="newPlacemark.ScoreParking" />
+                <ScoreInput Label="Персонал" @bind-value="newPlacemark.ScoreStaff" />
+
+                <div class="field">
+                    <label class="form-label">Примечания:</label>
+                    <textarea @bind="newPlacemark.Notes" class="form-control" rows="2"></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button class="btn btn-success" @onclick="AddPlacemark">@(editingId.HasValue ? "Сохранить" : "Добавить")</button>
+                    <button class="btn btn-secondary" @onclick="CloseForm">Отмена</button>
+                </div>
+
+                @if (!string.IsNullOrEmpty(message))
+                {
+                    <div class="alert @(isError ? "alert-danger" : "alert-success")">@message</div>
+                }
+            </aside>
+        }
+    </div>
 </div>
 
 @code {
@@ -73,13 +99,13 @@
     private string message = "";
     private bool isError = false;
     private DotNetObjectReference<Home>? dotNetRef;
+    private bool accessibilityMode = false;
 
     private int totalCount = 0;
     private int greenCount = 0;
     private int goldCount = 0;
     private int redCount = 0;
     private bool showCounter = false;
-
 
     private string currentFilter = "all";
 
@@ -93,6 +119,7 @@
         currentFilter = filter;
         await JS.InvokeVoidAsync("setFilter", filter);
     }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -100,6 +127,13 @@
             dotNetRef = DotNetObjectReference.Create(this);
             await JS.InvokeVoidAsync("setDotNetRef", dotNetRef);
             await LoadPlacemarks();
+
+            // Глубокая ссылка со списка: /?edit=<id> открывает форму редактирования
+            var match = System.Text.RegularExpressions.Regex.Match(new Uri(Navigation.Uri).Query, @"[?&]edit=(\d+)");
+            if (match.Success && int.TryParse(match.Groups[1].Value, out int editId))
+            {
+                await EditPlacemark(editId);
+            }
         }
     }
 
@@ -115,6 +149,13 @@
     }
 
     [JSInvokable]
+    public void OnAccessibilityModeChanged(bool enabled)
+    {
+        accessibilityMode = enabled;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
     public async Task OnMapClickWithCoords(double lat, double lon)
     {
         try
@@ -122,7 +163,7 @@
             var latStr = lat.ToString(System.Globalization.CultureInfo.InvariantCulture);
             var lonStr = lon.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
-            // Проверяем дубликат
+            // Проверяем дубликат (в радиусе 50 м)
             var nearestResponse = await Http.GetAsync($"/api/placemarks/nearest?lat={latStr}&lon={lonStr}");
             if (nearestResponse.IsSuccessStatusCode)
             {
@@ -197,6 +238,68 @@
         await LoadPlacemarks();
     }
 
+    [JSInvokable]
+    public async Task SearchAddress(string query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return;
+        }
+
+        try
+        {
+            var json = await Http.GetStringAsync($"/api/placemarks/geocode?address={Uri.EscapeDataString(query)}");
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var members = doc.RootElement
+                .GetProperty("response")
+                .GetProperty("GeoObjectCollection")
+                .GetProperty("featureMember");
+
+            if (members.GetArrayLength() == 0)
+            {
+                message = "Ничего не найдено";
+                isError = true;
+                StateHasChanged();
+                return;
+            }
+
+            var go = members[0].GetProperty("GeoObject");
+            var pos = go.GetProperty("Point").GetProperty("pos").GetString();
+            var text = go.GetProperty("metaDataProperty").GetProperty("GeocoderMetaData").GetProperty("text").GetString() ?? query;
+            var parts = (pos ?? "").Split(' ');
+
+            if (parts.Length == 2 &&
+                double.TryParse(parts[0], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double lon) &&
+                double.TryParse(parts[1], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double lat))
+            {
+                await JS.InvokeVoidAsync("moveMapTo", lat, lon);
+                newPlacemark = new NewPlacemark
+                {
+                    Latitude = lat,
+                    Longitude = lon,
+                    Address = text
+                };
+                editingId = null;
+                showForm = true;
+                message = "Заполните данные объекта";
+                isError = false;
+                StateHasChanged();
+            }
+            else
+            {
+                message = "Не удалось определить координаты";
+                isError = true;
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            message = "Ошибка поиска: " + ex.Message;
+            isError = true;
+            StateHasChanged();
+        }
+    }
+
     private async Task LoadPlacemarks()
     {
         var placemarks = await Http.GetFromJsonAsync<List<PlacemarkData>>("/api/placemarks");
@@ -246,7 +349,6 @@
             isError = true;
         }
     }
-   
 
     public void Dispose()
     {
