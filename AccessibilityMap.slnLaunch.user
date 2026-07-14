@@ -1,0 +1,15 @@
+[
+  {
+    "Name": "Новый профиль",
+    "Projects": [
+      {
+        "Path": "AccessibilityMap.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "..\\AccessibilityMap.Server\\AccessibilityMap.Server.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

@@ -1,0 +1,303 @@
+﻿@page "/"
+@inject HttpClient Http
+@inject IJSRuntime JS
+@implements IDisposable
+
+<div style="display: flex; gap: 30px;">
+    <div style="width: @(showForm ? "60%" : "100%");">
+        <div style="width: 100%; height: 600px; border-radius: 12px; overflow: hidden;" id="map"></div>
+    </div>
+
+    @if (showForm)
+    {
+        <div style="width: 40%;">
+            <h5 style="color: #fff; margin-bottom: 15px;">@(editingId.HasValue ? "Редактировать объект" : "Добавить объект")</h5>
+
+            <div style="margin-bottom: 12px;">
+                <label style="color: #aaa; font-size: 13px;">Адрес:</label>
+                <input @bind="newPlacemark.Address" class="form-control" placeholder="ул. Ленина, 10, Воронеж"
+                       style="background: #2a2a2a; border: 1px solid #444; color: #fff;" />
+            </div>
+
+            <div style="margin-bottom: 12px;">
+                <label style="color: #aaa; font-size: 13px;">Название:</label>
+                <input @bind="newPlacemark.Name" class="form-control" style="background: #2a2a2a; border: 1px solid #444; color: #fff;" />
+            </div>
+
+            <div style="margin-bottom: 12px;">
+                <label style="color: #aaa; font-size: 13px;">Категория:</label>
+                <select @bind="newPlacemark.Category" class="form-control" style="background: #2a2a2a; border: 1px solid #444; color: #fff;">
+                    <option value="">Выберите...</option>
+                    <option>Поликлиника</option>
+                    <option>Аптека</option>
+                    <option>Магазин</option>
+                    <option>Администрация</option>
+                    <option>Культура</option>
+                    <option>Образование</option>
+                    <option>Другое</option>
+                </select>
+            </div>
+
+            <h6 style="color: #ccc; margin-top: 15px;">Критерии (0-3):</h6>
+            <ScoreInput Label="Вход" @bind-value="newPlacemark.ScoreEntrance" />
+            <ScoreInput Label="Ширина дверей" @bind-value="newPlacemark.ScoreDoorWidth" />
+            <ScoreInput Label="Внутренние пути" @bind-value="newPlacemark.ScoreInternalPath" />
+            <ScoreInput Label="Санитарная зона" @bind-value="newPlacemark.ScoreSanitary" />
+            <ScoreInput Label="Информация" @bind-value="newPlacemark.ScoreInfo" />
+            <ScoreInput Label="Парковка" @bind-value="newPlacemark.ScoreParking" />
+            <ScoreInput Label="Персонал" @bind-value="newPlacemark.ScoreStaff" />
+
+            <div style="margin-bottom: 12px; margin-top: 12px;">
+                <label style="color: #aaa; font-size: 13px;">Примечания:</label>
+                <textarea @bind="newPlacemark.Notes" class="form-control" style="background: #2a2a2a; border: 1px solid #444; color: #fff;" rows="2"></textarea>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-success" @onclick="AddPlacemark" style="flex: 1;">@(editingId.HasValue ? "Сохранить" : "Добавить")</button>
+                <button class="btn btn-secondary" @onclick="CloseForm" style="flex: 1;">Отмена</button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(message))
+            {
+                <div class="alert @(isError ? "alert-danger" : "alert-success") mt-2" style="font-size: 13px; padding: 8px;">@message</div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+
+    private bool showForm = false;
+    private int? editingId = null;
+    private NewPlacemark newPlacemark = new();
+    private string message = "";
+    private bool isError = false;
+    private DotNetObjectReference<Home>? dotNetRef;
+
+    private int totalCount = 0;
+    private int greenCount = 0;
+    private int goldCount = 0;
+    private int redCount = 0;
+    private bool showCounter = false;
+
+
+    private string currentFilter = "all";
+
+    private async Task SetFilterAll() => await SetFilter("all");
+    private async Task SetFilterGreen() => await SetFilter("green");
+    private async Task SetFilterGold() => await SetFilter("gold");
+    private async Task SetFilterRed() => await SetFilter("red");
+
+    private async Task SetFilter(string filter)
+    {
+        currentFilter = filter;
+        await JS.InvokeVoidAsync("setFilter", filter);
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("setDotNetRef", dotNetRef);
+            await LoadPlacemarks();
+        }
+    }
+
+    [JSInvokable]
+    public async Task UpdateCounter(int total, int green, int gold, int red)
+    {
+        totalCount = total;
+        greenCount = green;
+        goldCount = gold;
+        redCount = red;
+        showCounter = total > 0;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public async Task OnMapClickWithCoords(double lat, double lon)
+    {
+        try
+        {
+            var latStr = lat.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var lonStr = lon.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            // Проверяем дубликат
+            var nearestResponse = await Http.GetAsync($"/api/placemarks/nearest?lat={latStr}&lon={lonStr}");
+            if (nearestResponse.IsSuccessStatusCode)
+            {
+                var existing = await nearestResponse.Content.ReadFromJsonAsync<PlacemarkData>();
+                if (existing != null)
+                {
+                    await JS.InvokeVoidAsync("openBalloon", existing.Id);
+                    return;
+                }
+            }
+
+            // Получаем адрес через сервер
+            var address = "";
+            try
+            {
+                var geoResponse = await Http.GetFromJsonAsync<GeocodingResponse>($"/api/placemarks/reverse-geocode?lat={latStr}&lon={lonStr}");
+                address = geoResponse?.Address ?? "";
+            }
+            catch { }
+
+            newPlacemark = new NewPlacemark
+            {
+                Latitude = lat,
+                Longitude = lon,
+                Address = address
+            };
+            editingId = null;
+            showForm = true;
+            message = "";
+            StateHasChanged();
+        }
+        catch { }
+    }
+
+    [JSInvokable]
+    public async Task EditPlacemark(int id)
+    {
+        try
+        {
+            var placemark = await Http.GetFromJsonAsync<PlacemarkData>($"/api/placemarks/{id}");
+            if (placemark != null)
+            {
+                editingId = id;
+                newPlacemark = new NewPlacemark
+                {
+                    Name = placemark.Name,
+                    Address = placemark.Address,
+                    Category = placemark.Category,
+                    Latitude = placemark.Latitude,
+                    Longitude = placemark.Longitude,
+                    ScoreEntrance = placemark.Scores?.Entrance ?? 0,
+                    ScoreDoorWidth = placemark.Scores?.DoorWidth ?? 0,
+                    ScoreInternalPath = placemark.Scores?.InternalPath ?? 0,
+                    ScoreSanitary = placemark.Scores?.Sanitary ?? 0,
+                    ScoreInfo = placemark.Scores?.Info ?? 0,
+                    ScoreParking = placemark.Scores?.Parking ?? 0,
+                    ScoreStaff = placemark.Scores?.Staff ?? 0,
+                    Notes = placemark.Notes
+                };
+                showForm = true;
+                message = "";
+                StateHasChanged();
+            }
+        }
+        catch { }
+    }
+
+    [JSInvokable]
+    public async Task DeletePlacemark(int id)
+    {
+        await Http.DeleteAsync($"/api/placemarks/{id}");
+        await LoadPlacemarks();
+    }
+
+    private async Task LoadPlacemarks()
+    {
+        var placemarks = await Http.GetFromJsonAsync<List<PlacemarkData>>("/api/placemarks");
+        await JS.InvokeVoidAsync("updatePlacemarks", placemarks ?? new List<PlacemarkData>());
+    }
+
+    private void CloseForm()
+    {
+        showForm = false;
+        editingId = null;
+        newPlacemark = new NewPlacemark();
+        message = "";
+    }
+
+    private async Task AddPlacemark()
+    {
+        if (string.IsNullOrWhiteSpace(newPlacemark.Name))
+        {
+            message = "Введите название!";
+            isError = true;
+            return;
+        }
+
+        HttpResponseMessage response;
+        if (editingId.HasValue)
+        {
+            response = await Http.PutAsJsonAsync($"/api/placemarks/{editingId.Value}", newPlacemark);
+        }
+        else
+        {
+            response = await Http.PostAsJsonAsync("/api/placemarks", newPlacemark);
+        }
+
+        if (response.IsSuccessStatusCode)
+        {
+            message = editingId.HasValue ? "Объект обновлён!" : "Объект добавлен!";
+            isError = false;
+            await Task.Delay(800);
+            showForm = false;
+            editingId = null;
+            newPlacemark = new NewPlacemark();
+            await LoadPlacemarks();
+        }
+        else
+        {
+            message = "Ошибка при сохранении";
+            isError = true;
+        }
+    }
+   
+
+    public void Dispose()
+    {
+        dotNetRef?.Dispose();
+    }
+
+    public class GeocodingResponse
+    {
+        public string Address { get; set; } = "";
+    }
+
+    public class PlacemarkData
+    {
+        public int Id { get; set; }
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public string Name { get; set; } = "";
+        public string Address { get; set; } = "";
+        public string Category { get; set; } = "";
+        public string LevelText { get; set; } = "";
+        public string Level { get; set; } = "";
+        public int TotalScore { get; set; }
+        public string Notes { get; set; } = "";
+        public PlacemarkScores? Scores { get; set; }
+    }
+
+    public class PlacemarkScores
+    {
+        public int Entrance { get; set; }
+        public int DoorWidth { get; set; }
+        public int InternalPath { get; set; }
+        public int Sanitary { get; set; }
+        public int Info { get; set; }
+        public int Parking { get; set; }
+        public int Staff { get; set; }
+    }
+
+    public class NewPlacemark
+    {
+        public string Name { get; set; } = "";
+        public string Address { get; set; } = "";
+        public string Category { get; set; } = "";
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public int ScoreEntrance { get; set; }
+        public int ScoreDoorWidth { get; set; }
+        public int ScoreInternalPath { get; set; }
+        public int ScoreSanitary { get; set; }
+        public int ScoreInfo { get; set; }
+        public int ScoreParking { get; set; }
+        public int ScoreStaff { get; set; }
+        public string Notes { get; set; } = "";
+    }
+}

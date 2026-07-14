@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Карта Доступности</title>
+    <base href="/" />
+    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="AccessibilityMap.styles.css" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=d803c1da-b012-4e3b-b0f7-72ddf1c0208a&lang=ru_RU&load=package.full" defer></script>
+</head>
+
+<body>
+    <div id="app">
+        <svg class="loading-progress">
+            <circle r="40%" cx="50%" cy="50%" />
+            <circle r="40%" cx="50%" cy="50%" />
+        </svg>
+        <div class="loading-progress-text"></div>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="." class="reload">Reload</a>
+        <span class="dismiss">🗙</span>
+    </div>
+
+    <script src="_framework/blazor.webassembly.js"></script>
+
+    <script>
+        var map;
+        var accessibilityMode = false;
+        var placemarksData = [];
+        var placemarkObjects = {};
+        var dotNetRef;
+        var currentFilter = 'all';
+
+        function setDotNetRef(ref) {
+            dotNetRef = ref;
+        }
+
+        function setFilter(filter) {
+            currentFilter = filter;
+            showPlacemarks();
+            updateCounter();
+        }
+
+        function updatePlacemarks(placemarks) {
+            placemarksData = placemarks || [];
+            ymaps.ready(function () {
+                if (!map) {
+                    map = new ymaps.Map("map", {
+                        center: [51.672, 39.192],
+                        zoom: 12,
+                        controls: [
+                            'searchControl',
+                            'zoomControl',
+                            'typeSelector',
+                            'fullscreenControl',
+                            'trafficControl',
+                            'rulerControl'
+                        ],
+                        suppressMapOpenBlock: true
+                    });
+
+                    var accessibilityButton = new ymaps.control.Button({
+                        data: { title: 'Доступность' },
+                        options: {
+                            maxWidth: 150,
+                            layout: ymaps.templateLayoutFactory.createClass(
+                                '<button style="padding:5px 10px; font-size:12px; border:1px solid #ccc; border-radius:4px; cursor:pointer; background:#fff; color:#333; white-space:nowrap;">♿ Доступность</button>'
+                            )
+                        }
+                    });
+                    accessibilityButton.events.add('click', function () {
+                        toggleAccessibilityMode();
+                    });
+                    map.controls.add(accessibilityButton, { float: 'right', position: { top: 45, right: 10 } });
+
+                    map.events.add('click', function (e) {
+                        if (accessibilityMode && dotNetRef) {
+                            var coords = e.get('coords');
+                            dotNetRef.invokeMethodAsync('OnMapClickWithCoords', coords[0], coords[1]);
+                        }
+                    });
+                }
+                showPlacemarks();
+                updateCounter();
+            });
+        }
+
+        function toggleAccessibilityMode() {
+            accessibilityMode = !accessibilityMode;
+            if (accessibilityMode) {
+                map.behaviors.disable('drag');
+                setTimeout(function () { map.behaviors.enable('drag'); }, 100);
+            }
+            showPlacemarks();
+            updateCounter();
+            if (dotNetRef) {
+                dotNetRef.invokeMethodAsync('OnAccessibilityModeChanged', accessibilityMode);
+            }
+        }
+
+        function updateCounter() {
+            if (dotNetRef) {
+                var total = placemarksData.length;
+                var green = placemarksData.filter(function (p) { return p.level === 'green'; }).length;
+                var gold = placemarksData.filter(function (p) { return p.level === 'gold'; }).length;
+                var red = placemarksData.filter(function (p) { return p.level === 'red'; }).length;
+                dotNetRef.invokeMethodAsync('UpdateCounter', total, green, gold, red);
+            }
+        }
+
+        function showPlacemarks() {
+            if (!map) return;
+            map.geoObjects.removeAll();
+            placemarkObjects = {};
+            if (accessibilityMode && placemarksData.length > 0) {
+                var filtered = placemarksData;
+                if (currentFilter !== 'all') {
+                    filtered = placemarksData.filter(function (p) { return p.level === currentFilter; });
+                }
+                filtered.forEach(function (p) {
+                    var scores = '';
+                    if (p.scores) {
+                        scores =
+                            '<div style="font-size:11px; color:#555; margin:8px 0; line-height:1.6;">' +
+                            '<b>Критерии:</b><br/>' +
+                            '🚪 Вход: ' + p.scores.entrance + '/3<br/>' +
+                            '🚶 Ширина дверей: ' + p.scores.doorWidth + '/3<br/>' +
+                            '🛤 Внутренние пути: ' + p.scores.internalPath + '/3<br/>' +
+                            '🚻 Санитарная зона: ' + p.scores.sanitary + '/3<br/>' +
+                            'ℹ️ Информация: ' + p.scores.info + '/3<br/>' +
+                            '🅿️ Парковка: ' + p.scores.parking + '/3<br/>' +
+                            '👤 Персонал: ' + p.scores.staff + '/3<br/>' +
+                            '</div>';
+                    }
+
+                    var content =
+                        '<div style="font-family:sans-serif; max-width:250px;">' +
+                        '<h4 style="margin:0 0 6px 0; color:#333;">' + p.name + '</h4>' +
+                        '<p style="margin:0 0 4px 0; color:#666; font-size:12px;">📍 ' + (p.address || 'Адрес не указан') + '</p>' +
+                        '<p style="margin:0 0 8px 0; color:#666; font-size:12px;">📂 ' + (p.category || 'Без категории') + '</p>' +
+                        '<div style="background:' + getLevelColor(p.level) + '; color:#fff; padding:6px 10px; border-radius:4px; text-align:center; font-weight:bold; margin-bottom:8px;">' +
+                        p.levelText + ' (' + p.totalScore + ' / 21 баллов)' +
+                        '</div>' +
+                        scores +
+                        (p.notes ? '<div style="font-size:11px; color:#888; margin-top:8px; font-style:italic;">📝 ' + p.notes + '</div>' : '') +
+                        '<button onclick="editPlacemark(' + p.id + ')" style="padding:4px 10px; background:#2196F3; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px; margin-right:4px;">✏️ Изменить</button>' +
+                        '<button onclick="deletePlacemark(' + p.id + ')" style="padding:4px 10px; background:#F44336; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px;">🗑 Удалить</button>' +
+                        '</div>';
+
+                    var pm = new ymaps.Placemark([p.latitude, p.longitude], {
+                        balloonContent: content
+                    }, {
+                        iconLayout: 'default#image',
+                        iconImageHref: 'https://cdn.jsdelivr.net/gh/pointhi/leaflet-color-markers@master/img/marker-icon-2x-' + p.level + '.png',
+                        iconImageSize: [25, 41],
+                        iconImageOffset: [-12, -41]
+                    });
+                    placemarkObjects[p.id] = pm;
+                    map.geoObjects.add(pm);
+                });
+            }
+        }
+
+        function getLevelColor(level) {
+            if (level === 'green') return '#4CAF50';
+            if (level === 'gold') return '#FFC107';
+            return '#F44336';
+        }
+
+        function openBalloon(id) {
+            var pm = placemarkObjects[id];
+            if (pm) {
+                pm.balloon.open();
+            }
+        }
+
+        function deletePlacemark(id) {
+            if (confirm('Удалить этот объект?')) {
+                var pm = placemarkObjects[id];
+                if (pm && pm.balloon) pm.balloon.close();
+                if (dotNetRef) {
+                    dotNetRef.invokeMethodAsync('DeletePlacemark', id);
+                }
+            }
+        }
+
+        function editPlacemark(id) {
+            if (dotNetRef) {
+                var pm = placemarkObjects[id];
+                if (pm && pm.balloon) pm.balloon.close();
+                dotNetRef.invokeMethodAsync('EditPlacemark', id);
+            }
+        }
+
+        // Кастомный поиск через наш геокодер
+        var searchButton = new ymaps.control.Button({
+            data: { title: 'Поиск' },
+            options: {
+                maxWidth: 250,
+                layout: ymaps.templateLayoutFactory.createClass(
+                    '<div style="display:flex; gap:4px; padding:4px; background:#fff; border-radius:4px; box-shadow:0 1px 3px rgba(0,0,0,0.2);">' +
+                    '<input id="customSearchInput" type="text" placeholder="Поиск адреса..." style="padding:4px 8px; border:1px solid #ccc; border-radius:3px; font-size:12px; width:180px;">' +
+                    '<button id="customSearchBtn" style="padding:4px 8px; background:#2196F3; color:#fff; border:none; border-radius:3px; cursor:pointer; font-size:12px;">🔍</button>' +
+                    '</div>'
+                )
+            }
+        });
+
+        searchButton.events.add('click', function (e) {
+            // Предотвращаем всплытие
+        });
+
+        map.controls.add(searchButton, { float: 'left', position: { top: 10, left: 10 } });
+
+        // После добавления контрола вешаем обработчик
+        setTimeout(function () {
+            var btn = document.getElementById('customSearchBtn');
+            var input = document.getElementById('customSearchInput');
+            if (btn && input) {
+                btn.onclick = function () {
+                    var query = input.value.trim();
+                    if (query && dotNetRef) {
+                        dotNetRef.invokeMethodAsync('SearchAddress', query);
+                    }
+                };
+                input.onkeydown = function (e) {
+                    if (e.key === 'Enter') {
+                        btn.click();
+                    }
+                };
+            }
+        }, 500);
+
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,33 @@
+﻿<div style="margin-bottom: 12px;">
+    <label style="color: #aaa; font-size: 13px;">@Label:</label>
+    <input type="text" inputmode="numeric" pattern="[0-3]" maxlength="1" value="@(Value == 0 ? "" : Value.ToString())"
+           @oninput="OnInput" placeholder="0" class="form-control"
+           style="width: 100%; background: #2a2a2a; border: 1px solid #444; color: #fff;" />
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public int Value { get; set; }
+    [Parameter] public EventCallback<int> ValueChanged { get; set; }
+
+    private async Task OnInput(ChangeEventArgs e)
+    {
+        var input = e.Value?.ToString() ?? "";
+        input = new string(input.Where(char.IsDigit).ToArray());
+
+        if (input.Length > 0)
+        {
+            if (int.TryParse(input, out int val))
+            {
+                if (val > 3) val = 3;
+                Value = val;
+            }
+        }
+        else
+        {
+            Value = 0;
+        }
+
+        await ValueChanged.InvokeAsync(Value);
+    }
+}
