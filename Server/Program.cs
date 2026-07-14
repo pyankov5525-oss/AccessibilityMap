@@ -31,7 +31,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors();
 //app.UseHttpsRedirection();
+app.UseBlazorFrameworkFiles();
+app.UseStaticFiles();
 app.MapControllers();
+app.MapFallbackToFile("index.html");
 
 using (var scope = app.Services.CreateScope())
 {
