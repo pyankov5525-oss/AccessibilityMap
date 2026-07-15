@@ -117,25 +117,6 @@ app.UseStaticFiles();
 app.MapControllers();
 app.MapFallbackToFile("index.html");
 
-// Диагностика маршрутизации API (временно): печатает в консоль сервера замапленные endpoint'ы.
-try
-{
-    var epSource = app.Services.GetRequiredService<Microsoft.AspNetCore.Http.EndpointDataSource>();
-    app.Logger.LogInformation("Зарегистрировано endpoint'ов: {Count}", epSource.Endpoints.Count);
-    foreach (var ep in epSource.Endpoints)
-    {
-        if (ep is Microsoft.AspNetCore.Routing.RouteEndpoint re && re.RoutePattern.RawText != null &&
-            re.RoutePattern.RawText.Contains("placemarks"))
-        {
-            app.Logger.LogInformation("API endpoint: {Route}", re.RoutePattern.RawText);
-        }
-    }
-}
-catch (Exception ex)
-{
-    app.Logger.LogWarning("Не удалось напечатать диагностику endpoint'ов: {Msg}", ex.Message);
-}
-
 // Папка для загруженных фотографий (вне wwwroot, отдаётся через API)
 Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "uploads"));
 
