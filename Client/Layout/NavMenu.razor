@@ -1,3 +1,5 @@
+@inject AccessibilityMap.Client.Services.AuthState Auth
+@inject HttpClient Http
 @inject NavigationManager Nav
 
 <div class="topbar">
@@ -5,5 +7,30 @@
     <nav class="nav-links">
         <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Карта</NavLink>
         <NavLink class="nav-link" href="places">Список</NavLink>
+        @if (Auth.Role == "Manager" || Auth.Role == "Developer")
+        {
+            <NavLink class="nav-link" href="verify">Проверка</NavLink>
+            <NavLink class="nav-link" href="users">Пользователи</NavLink>
+        }
     </nav>
+    <div class="user-box">
+        <span class="muted">@Auth.UserName · @RoleRu</span>
+        <button class="btn btn-sm btn-secondary" @onclick="Logout">Выйти</button>
+    </div>
 </div>
+
+@code {
+    private string RoleRu => Auth.Role switch
+    {
+        "Developer" => "Разработчик",
+        "Manager" => "Управляющий",
+        "Volunteer" => "Волонтёр",
+        _ => Auth.Role
+    };
+
+    private async Task Logout()
+    {
+        try { await Http.PostAsync("/api/auth/logout", null); } catch { }
+        Auth.Clear();
+    }
+}

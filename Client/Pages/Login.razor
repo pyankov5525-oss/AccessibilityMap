@@ -1,0 +1,60 @@
+@inject HttpClient Http
+@inject AccessibilityMap.Client.Services.AuthState Auth
+
+<div class="login-overlay">
+    <div class="login-card">
+        <h3>♿ Карта доступности</h3>
+        <p class="muted">Войдите в систему</p>
+        <div class="field">
+            <label class="form-label">Логин:</label>
+            <input @bind="login" class="form-control" />
+        </div>
+        <div class="field">
+            <label class="form-label">Пароль:</label>
+            <input type="password" @bind="password" class="form-control" />
+        </div>
+        <button class="btn btn-primary" @onclick="DoLogin">Войти</button>
+        @if (!string.IsNullOrEmpty(error))
+        {
+            <div class="alert alert-danger">@error</div>
+        }
+    </div>
+</div>
+
+@code {
+    private string login = "";
+    private string password = "";
+    private string error = "";
+
+    private async Task DoLogin()
+    {
+        error = "";
+        try
+        {
+            var response = await Http.PostAsJsonAsync("/api/auth/login", new { Login = login, Password = password });
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<LoginResult>();
+                if (result != null)
+                {
+                    Auth.Set(result.Token, result.UserName, result.Role);
+                }
+            }
+            else
+            {
+                error = "Неверный логин или пароль";
+            }
+        }
+        catch (Exception ex)
+        {
+            error = "Ошибка входа: " + ex.Message;
+        }
+    }
+
+    public class LoginResult
+    {
+        public string Token { get; set; } = "";
+        public string UserName { get; set; } = "";
+        public string Role { get; set; } = "";
+    }
+}

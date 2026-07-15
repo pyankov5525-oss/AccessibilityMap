@@ -1,0 +1,68 @@
+@page "/verify"
+@inject HttpClient Http
+@inject AccessibilityMap.Client.Services.AuthState Auth
+
+<h3>Проверка меток</h3>
+@if (items == null)
+{
+    <p>Загрузка...</p>
+}
+else
+{
+    <div class="page">
+        <table class="places-table">
+            <thead>
+                <tr><th>Название</th><th>Адрес</th><th>Уровень</th><th>Статус</th><th></th></tr>
+            </thead>
+            <tbody>
+            @foreach (var it in items)
+            {
+                <tr>
+                    <td>@it.Name</td>
+                    <td>@it.Address</td>
+                    <td>@it.LevelText</td>
+                    <td>@StatusText(it.VerificationStatus)</td>
+                    <td class="row-actions">
+                        <button class="btn btn-sm btn-success" @onclick="@(() => SetStatus(it.Id, "approved"))">Одобрить</button>
+                        <button class="btn btn-sm btn-danger" @onclick="@(() => SetStatus(it.Id, "rejected"))">Отклонить</button>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<PlacemarkData>? items;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        items = await Http.GetFromJsonAsync<List<PlacemarkData>>("/api/placemarks");
+        StateHasChanged();
+    }
+
+    private async Task SetStatus(int id, string status)
+    {
+        await Http.PostAsJsonAsync($"/api/placemarks/{id}/verify", new { Status = status });
+        await Load();
+    }
+
+    private string StatusText(string s) => s switch
+    {
+        "approved" => "Одобрено",
+        "rejected" => "Отклонено",
+        _ => "На проверке"
+    };
+
+    public class PlacemarkData
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public string Address { get; set; } = "";
+        public string LevelText { get; set; } = "";
+        public string VerificationStatus { get; set; } = "pending";
+    }
+}

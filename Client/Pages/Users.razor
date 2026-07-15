@@ -1,0 +1,73 @@
+@page "/users"
+@inject HttpClient Http
+@inject AccessibilityMap.Client.Services.AuthState Auth
+
+<h3>Управление пользователями</h3>
+<p>Вы вошли как: <b>@RoleRu</b></p>
+
+@if (Auth.Role == "Developer")
+{
+    <div class="form-card" style="max-width:440px;">
+        <h5>Создать управляющего или разработчика</h5>
+        <div class="field">
+            <select @bind="newRole" class="form-control">
+                <option value="Manager">Управляющий</option>
+                <option value="Developer">Разработчик</option>
+            </select>
+        </div>
+        <button class="btn btn-primary" @onclick="CreateManagerOrDev">Создать</button>
+    </div>
+}
+else if (Auth.Role == "Manager")
+{
+    <div class="form-card" style="max-width:440px;">
+        <h5>Создать волонтёра</h5>
+        <button class="btn btn-primary" @onclick="CreateVolunteer">Создать волонтёра</button>
+    </div>
+}
+else
+{
+    <p class="muted">Нет доступа.</p>
+}
+
+@if (created != null)
+{
+    <div class="alert alert-success" style="max-width:440px; margin-top:12px;">
+        Создан аккаунт:<br />
+        Логин: <b>@created.Login</b><br />
+        Пароль: <b>@created.Password</b><br />
+        Роль: @created.Role
+    </div>
+}
+
+@code {
+    private string newRole = "Manager";
+    private CreatedUser? created;
+
+    private async Task CreateManagerOrDev()
+    {
+        var res = await Http.PostAsJsonAsync("/api/auth/create", new { Role = newRole });
+        if (res.IsSuccessStatusCode) created = await res.Content.ReadFromJsonAsync<CreatedUser>();
+    }
+
+    private async Task CreateVolunteer()
+    {
+        var res = await Http.PostAsJsonAsync("/api/auth/create-volunteer", new { });
+        if (res.IsSuccessStatusCode) created = await res.Content.ReadFromJsonAsync<CreatedUser>();
+    }
+
+    private string RoleRu => Auth.Role switch
+    {
+        "Developer" => "Разработчик",
+        "Manager" => "Управляющий",
+        "Volunteer" => "Волонтёр",
+        _ => Auth.Role
+    };
+
+    public class CreatedUser
+    {
+        public string Login { get; set; } = "";
+        public string Password { get; set; } = "";
+        public string Role { get; set; } = "";
+    }
+}

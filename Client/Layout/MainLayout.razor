@@ -1,8 +1,22 @@
 @inherits LayoutComponentBase
+@inject AccessibilityMap.Client.Services.AuthState Auth
+@implements IDisposable
 
-<div class="app-shell">
-    <NavMenu />
-    <main class="app-main">
-        @Body
-    </main>
-</div>
+@if (Auth.IsAuthenticated)
+{
+    <div class="app-shell">
+        <NavMenu />
+        <main class="app-main">
+            @Body
+        </main>
+    </div>
+}
+else
+{
+    <Login />
+}
+
+@code {
+    protected override void OnInitialized() => Auth.OnChange += StateHasChanged;
+    public void Dispose() => Auth.OnChange -= StateHasChanged;
+}

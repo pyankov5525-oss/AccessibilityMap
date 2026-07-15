@@ -1,16 +1,20 @@
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
-using AccessibilityMap;
+using System.Net.Http;
+using AccessibilityMap.Client.Services;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-// HttpClient для вызовов API (базовый адрес = адрес приложения)
-builder.Services.AddScoped(sp => new HttpClient
+// Авторизация: состояние + handler, который подставляет JWT-токен во все запросы
+builder.Services.AddScoped<AuthState>();
+builder.Services.AddScoped<AuthHandler>();
+builder.Services.AddScoped(sp =>
 {
-    BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
+    var handler = new AuthHandler(new HttpClientHandler(), sp.GetRequiredService<AuthState>());
+    return new HttpClient(handler) { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) };
 });
 
 await builder.Build().RunAsync();
