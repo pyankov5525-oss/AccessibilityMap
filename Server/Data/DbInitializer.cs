@@ -24,7 +24,8 @@ public static class DbInitializer
                 Latitude = 51.6784, Longitude = 39.2105,
                 ScoreEntrance = 3, ScoreDoorWidth = 3, ScoreInternalPath = 3, ScoreSanitary = 3,
                 ScoreInfo = 3, ScoreParking = 2, ScoreStaff = 3,
-                Notes = "Смотровая площадка с пандусом и тактильными указателями."
+                Notes = "Смотровая площадка с пандусом и тактильными указателями.",
+                VerificationStatus = "approved"
             },
             new()
             {
@@ -32,7 +33,8 @@ public static class DbInitializer
                 Latitude = 51.6601, Longitude = 39.2003,
                 ScoreEntrance = 2, ScoreDoorWidth = 2, ScoreInternalPath = 2, ScoreSanitary = 2,
                 ScoreInfo = 1, ScoreParking = 2, ScoreStaff = 2,
-                Notes = "Есть тропинки, но мало указателей и озвучки."
+                Notes = "Есть тропинки, но мало указателей и озвучки.",
+                VerificationStatus = "approved"
             },
             new()
             {
@@ -40,7 +42,8 @@ public static class DbInitializer
                 Latitude = 51.6572, Longitude = 39.2151,
                 ScoreEntrance = 1, ScoreDoorWidth = 1, ScoreInternalPath = 1, ScoreSanitary = 0,
                 ScoreInfo = 1, ScoreParking = 0, ScoreStaff = 1,
-                Notes = "Бордюры без съездов, туалет недоступен."
+                Notes = "Бордюры без съездов, туалет недоступен.",
+                VerificationStatus = "approved"
             },
             new()
             {
@@ -48,7 +51,8 @@ public static class DbInitializer
                 Latitude = 51.6705, Longitude = 39.1902,
                 ScoreEntrance = 2, ScoreDoorWidth = 2, ScoreInternalPath = 1, ScoreSanitary = 2,
                 ScoreInfo = 2, ScoreParking = 1, ScoreStaff = 2,
-                Notes = "Вход со ступеньками, персонал помогает."
+                Notes = "Вход со ступеньками, персонал помогает.",
+                VerificationStatus = "approved"
             },
             new()
             {
@@ -56,7 +60,8 @@ public static class DbInitializer
                 Latitude = 51.6720, Longitude = 39.2070,
                 ScoreEntrance = 1, ScoreDoorWidth = 1, ScoreInternalPath = 0, ScoreSanitary = 1,
                 ScoreInfo = 1, ScoreParking = 1, ScoreStaff = 0,
-                Notes = "Перрон недоступен без посторонней помощи."
+                Notes = "Перрон недоступен без посторонней помощи.",
+                VerificationStatus = "approved"
             }
         };
 

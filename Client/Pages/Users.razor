@@ -40,9 +40,146 @@ else
     </div>
 }
 
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert alert-warning" style="max-width:440px; margin-top:12px;">@message</div>
+}
+
+@{
+    RenderFragment<string> UserSection = role => @<div>
+        @{
+            var list = users.Where(u => u.Role == role).ToList();
+        }
+        @if (list.Count == 0)
+        {
+            <p class="muted">Нет.</p>
+        }
+        else
+        {
+            <table class="places-table">
+                <thead>
+                    <tr><th>Логин</th><th>Роль</th><th></th></tr>
+                </thead>
+                <tbody>
+                @foreach (var u in list)
+                {
+                    bool isSelf = u.UserName == Auth.UserName;
+                    <tr>
+                        <td>@(u.UserName + (isSelf ? " (вы)" : ""))</td>
+                        <td>
+                            @if (Auth.Role == "Developer")
+                            {
+                                <select class="form-control form-control-sm" @onchange="e => ChangeRole(u.Id, e.Value?.ToString() ?? "")">
+                                    @foreach (var r in new[] { "Developer", "Manager", "Volunteer" })
+                                    {
+                                        @if (r == u.Role)
+                                        {
+                                            <option value="@r" selected>@RoleRu(r)</option>
+                                        }
+                                        else
+                                        {
+                                            <option value="@r">@RoleRu(r)</option>
+                                        }
+                                    }
+                                </select>
+                            }
+                            else
+                            {
+                                @RoleRu(u.Role)
+                            }
+                        </td>
+                        <td class="row-actions">
+                            <button class="btn btn-sm btn-danger" disabled="@isSelf" @onclick="() => DeleteUser(u.Id)">Удалить</button>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+    </div>;
+}
+
+@if (loading)
+{
+    <p>Загрузка пользователей...</p>
+}
+else
+{
+    <div class="page">
+        <h5>Разработчики</h5>
+        @UserSection("Developer")
+        <h5>Управляющие</h5>
+        @UserSection("Manager")
+        <h5>Волонтёры</h5>
+        @UserSection("Volunteer")
+    </div>
+}
+
 @code {
     private string newRole = "Manager";
     private CreatedUser? created;
+    private List<UserRow> users = new();
+    private bool loading = true;
+    private string message = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsers();
+        loading = false;
+    }
+
+    private async Task LoadUsers()
+    {
+        try
+        {
+            var resp = await Http.GetAsync("/api/auth/users");
+            if (resp.IsSuccessStatusCode)
+            {
+                users = await resp.Content.ReadFromJsonAsync<List<UserRow>>() ?? new List<UserRow>();
+            }
+            else
+            {
+                users = new List<UserRow>();
+            }
+        }
+        catch
+        {
+            users = new List<UserRow>();
+        }
+    }
+
+    private async Task ChangeRole(string id, string role)
+    {
+        if (string.IsNullOrEmpty(role)) return;
+        var resp = await Http.PostAsJsonAsync($"/api/auth/{id}/role", new { Role = role });
+        if (!resp.IsSuccessStatusCode)
+        {
+            var err = await resp.Content.ReadFromJsonAsync<ErrorResult>();
+            message = err?.Error ?? "Не удалось сменить роль";
+        }
+        else
+        {
+            message = "";
+        }
+        await LoadUsers();
+        StateHasChanged();
+    }
+
+    private async Task DeleteUser(string id)
+    {
+        var resp = await Http.DeleteAsync($"/api/auth/{id}");
+        if (!resp.IsSuccessStatusCode)
+        {
+            var err = await resp.Content.ReadFromJsonAsync<ErrorResult>();
+            message = err?.Error ?? "Не удалось удалить";
+        }
+        else
+        {
+            message = "";
+        }
+        await LoadUsers();
+        StateHasChanged();
+    }
 
     private async Task CreateManagerOrDev()
     {
@@ -56,18 +193,30 @@ else
         if (res.IsSuccessStatusCode) created = await res.Content.ReadFromJsonAsync<CreatedUser>();
     }
 
-    private string RoleRu => Auth.Role switch
+    private string RoleRu(string r) => r switch
     {
         "Developer" => "Разработчик",
         "Manager" => "Управляющий",
         "Volunteer" => "Волонтёр",
-        _ => Auth.Role
+        _ => r
     };
+
+    public class UserRow
+    {
+        public string Id { get; set; } = "";
+        public string UserName { get; set; } = "";
+        public string Role { get; set; } = "";
+    }
 
     public class CreatedUser
     {
         public string Login { get; set; } = "";
         public string Password { get; set; } = "";
         public string Role { get; set; } = "";
+    }
+
+    public class ErrorResult
+    {
+        public string Error { get; set; } = "";
     }
 }

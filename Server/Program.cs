@@ -7,6 +7,7 @@ using Npgsql;
 using System.IO;
 using System.Linq;
 using System.Text;
+using AccessibilityMap.Server;
 using AccessibilityMap.Server.Data;
 using AccessibilityMap.Server.Models;
 
@@ -84,6 +85,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHttpClient();
+builder.Services.AddHostedService<PlacemarkCleanupService>();
 
 builder.Services.AddCors(options =>
 {
@@ -127,6 +129,8 @@ using (var scope = app.Services.CreateScope())
     db.Database.EnsureCreated();
     await DbInitializer.SeedAsync(db);
     await SeedRolesAndAdminAsync(services);
+    // Известный аккаунт разработчика через переменные окружения (восстановление доступа)
+    await EnsureEnvAdminAsync(services);
 }
 
 app.Run();
@@ -158,6 +162,37 @@ static async Task SeedRolesAndAdminAsync(IServiceProvider services)
             Console.WriteLine("  Сохраните их! Потом создавайте остальных через интерфейс.");
             Console.WriteLine("==================================================");
         }
+    }
+}
+
+// Если заданы SEED_LOGIN и SEED_PASSWORD — гарантируем существование
+// разработчика с этими данными (создаём или сбрасываем пароль). Это позволяет
+// восстановить доступ на хостинге (Render и т.п.), где логи недоступны/эфемерны.
+static async Task EnsureEnvAdminAsync(IServiceProvider services)
+{
+    var login = Environment.GetEnvironmentVariable("SEED_LOGIN");
+    var password = Environment.GetEnvironmentVariable("SEED_PASSWORD");
+    if (string.IsNullOrEmpty(login) || string.IsNullOrEmpty(password))
+        return;
+
+    var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
+    var user = await userManager.FindByNameAsync(login);
+    if (user == null)
+    {
+        user = new ApplicationUser { UserName = login, EmailConfirmed = true };
+        var result = await userManager.CreateAsync(user, password);
+        if (result.Succeeded)
+        {
+            await userManager.AddToRoleAsync(user, "Developer");
+            Console.WriteLine($"Создан резервный разработчик из SEED_LOGIN/SEED_PASSWORD: {login}");
+        }
+    }
+    else
+    {
+        var token = await userManager.GeneratePasswordResetTokenAsync(user);
+        await userManager.ResetPasswordAsync(user, token, password);
+        if (!await userManager.IsInRoleAsync(user, "Developer"))
+            await userManager.AddToRoleAsync(user, "Developer");
     }
 }
 

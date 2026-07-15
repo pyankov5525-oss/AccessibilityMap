@@ -33,6 +33,8 @@
     <script>
         var map;
         var accessibilityMode = false;
+        var verifyMode = false;
+        var canVerify = false;
         var placemarksData = [];
         var placemarkObjects = {};
         var dotNetRef;
@@ -55,6 +57,7 @@
                 return;
             }
             ymaps.ready(function () {
+             try {
                 if (!map) {
                     map = new ymaps.Map("map", {
                         center: [51.672, 39.192],
@@ -105,6 +108,21 @@
                     });
                     map.controls.add(searchButton, { float: 'left', position: { top: 10, left: 10 } });
 
+                    // Кнопка «режим проверки» — только для управляющего/разработчика
+                    if (window.canVerify) {
+                        var verifyButton = new ymaps.control.Button({
+                            data: { title: 'Режим проверки' },
+                            options: {
+                                maxWidth: 220,
+                                layout: ymaps.templateLayoutFactory.createClass(
+                                    '<button style="padding:10px 18px; font-size:15px; font-weight:600; border:2px solid #9C27B0; border-radius:8px; cursor:pointer; background:#9C27B0; color:#fff; white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,.35);">🔍 Режим проверки</button>'
+                                )
+                            }
+                        });
+                        verifyButton.events.add('click', function () { toggleVerifyMode(); });
+                        map.controls.add(verifyButton, { float: 'right', position: { top: 95, right: 10 } });
+                    }
+
                     setTimeout(function () {
                         var btn = document.getElementById('customSearchBtn');
                         var input = document.getElementById('customSearchInput');
@@ -125,11 +143,15 @@
                 }
                 showPlacemarks();
                 updateCounter();
+             } catch (e) {
+                console.error('Ошибка инициализации карты Яндекс:', e);
+             }
             });
         }
 
         function toggleAccessibilityMode() {
             accessibilityMode = !accessibilityMode;
+            if (!accessibilityMode) verifyMode = false;
             if (accessibilityMode) {
                 map.behaviors.disable('drag');
                 setTimeout(function () { map.behaviors.enable('drag'); }, 100);
@@ -137,27 +159,76 @@
             showPlacemarks();
             updateCounter();
             if (dotNetRef) {
-                dotNetRef.invokeMethodAsync('OnAccessibilityModeChanged', accessibilityMode);
+                dotNetRef.invokeMethodAsync('OnAccessibilityModeChanged', accessibilityMode).catch(function(){});
+                if (!accessibilityMode) dotNetRef.invokeMethodAsync('OnVerifyModeChanged', false).catch(function(){});
             }
         }
 
-        function updateCounter() {
-            if (dotNetRef) {
-                var total = placemarksData.length;
-                var green = placemarksData.filter(function (p) { return p.level === 'green'; }).length;
-                var gold = placemarksData.filter(function (p) { return p.level === 'gold'; }).length;
-                var red = placemarksData.filter(function (p) { return p.level === 'red'; }).length;
-                dotNetRef.invokeMethodAsync('UpdateCounter', total, green, gold, red);
+        function setCanVerify(v) {
+            window.canVerify = !!v;
+        }
+
+        function toggleVerifyMode() {
+            verifyMode = !verifyMode;
+            if (verifyMode && !accessibilityMode) {
+                accessibilityMode = true;
+                if (dotNetRef) dotNetRef.invokeMethodAsync('OnAccessibilityModeChanged', true).catch(function(){});
             }
+            showPlacemarks();
+            updateCounter();
+            if (dotNetRef) dotNetRef.invokeMethodAsync('OnVerifyModeChanged', verifyMode).catch(function(){});
+        }
+
+        // Переход к конкретной метке из вкладки «Проверка» (глубокая ссылка /?focus=<id>)
+        function focusPlacemark(id) {
+            var attempt = 0;
+            function tryFocus() {
+                var p = placemarksData.find(function (x) { return x.id === id; });
+                if (!p || !map) { if (attempt++ < 12) setTimeout(tryFocus, 300); return; }
+                if (!accessibilityMode) {
+                    accessibilityMode = true;
+                    if (dotNetRef) dotNetRef.invokeMethodAsync('OnAccessibilityModeChanged', true).catch(function(){});
+                }
+                showPlacemarks();
+                updateCounter();
+                map.setCenter([p.latitude, p.longitude], 17, { duration: 300 });
+                var pm = placemarkObjects[id];
+                if (pm) pm.balloon.open();
+            }
+            tryFocus();
+        }
+
+        function updateCounter() {
+            if (!dotNetRef) return;
+            if (!accessibilityMode) {
+                dotNetRef.invokeMethodAsync('UpdateCounter', 0, 0, 0, 0).catch(function(){});
+                return;
+            }
+            var list = placemarksData;
+            if (verifyMode) {
+                list = list.filter(function (p) { return p.verificationStatus && p.verificationStatus !== 'approved'; });
+            } else if (currentFilter !== 'all') {
+                list = list.filter(function (p) { return p.level === currentFilter; });
+            }
+            var total = list.length;
+            var green = list.filter(function (p) { return p.level === 'green'; }).length;
+            var gold = list.filter(function (p) { return p.level === 'gold'; }).length;
+            var red = list.filter(function (p) { return p.level === 'red'; }).length;
+            dotNetRef.invokeMethodAsync('UpdateCounter', total, green, gold, red).catch(function(){});
         }
 
         function showPlacemarks() {
             if (!map) return;
             map.geoObjects.removeAll();
             placemarkObjects = {};
+            // п.3: метки показываем только в «режиме доступности»
+            if (!accessibilityMode) return;
             if (placemarksData.length > 0) {
                 var filtered = placemarksData;
-                if (currentFilter !== 'all') {
+                if (verifyMode) {
+                    // режим проверки — только неодобренные (серые) метки
+                    filtered = placemarksData.filter(function (p) { return p.verificationStatus && p.verificationStatus !== 'approved'; });
+                } else if (currentFilter !== 'all') {
                     filtered = placemarksData.filter(function (p) { return p.level === currentFilter; });
                 }
                 filtered.forEach(function (p) {
@@ -235,7 +306,7 @@
                 var pm = placemarkObjects[id];
                 if (pm && pm.balloon) pm.balloon.close();
                 if (dotNetRef) {
-                    dotNetRef.invokeMethodAsync('DeletePlacemark', id);
+                    dotNetRef.invokeMethodAsync('DeletePlacemark', id).catch(function(){});
                 }
             }
         }
@@ -244,7 +315,7 @@
             if (dotNetRef) {
                 var pm = placemarkObjects[id];
                 if (pm && pm.balloon) pm.balloon.close();
-                dotNetRef.invokeMethodAsync('EditPlacemark', id);
+                dotNetRef.invokeMethodAsync('EditPlacemark', id).catch(function(){});
             }
         }
 
@@ -262,14 +333,14 @@
             ymaps.geocode(query, { results: 1 }).then(function (res) {
                 var go = res.geoObjects.get(0);
                 if (!go) {
-                    if (dotNetRef) dotNetRef.invokeMethodAsync('OnGeocodeResult', 0, 0, '');
+                    if (dotNetRef) dotNetRef.invokeMethodAsync('OnGeocodeResult', 0, 0, '').catch(function(){});
                     return;
                 }
                 var coords = go.geometry.getCoordinates();
                 var text = go.getAddressLine ? go.getAddressLine() : go.properties.get('text');
-                if (dotNetRef) dotNetRef.invokeMethodAsync('OnGeocodeResult', coords[0], coords[1], text || '');
+                if (dotNetRef) dotNetRef.invokeMethodAsync('OnGeocodeResult', coords[0], coords[1], text || '').catch(function(){});
             }).catch(function () {
-                if (dotNetRef) dotNetRef.invokeMethodAsync('OnGeocodeResult', 0, 0, '');
+                if (dotNetRef) dotNetRef.invokeMethodAsync('OnGeocodeResult', 0, 0, '').catch(function(){});
             });
         }
 
@@ -281,7 +352,7 @@
             ymaps.geocode([lat, lon], { results: 1, kind: 'house' }).then(function (res) {
                 var go = res.geoObjects.get(0);
                 var text = go ? (go.getAddressLine ? go.getAddressLine() : go.properties.get('text')) : '';
-                if (dotNetRef) dotNetRef.invokeMethodAsync('OnReverseGeocodeResult', text || '');
+                if (dotNetRef) dotNetRef.invokeMethodAsync('OnReverseGeocodeResult', text || '').catch(function(){});
             }).catch(function () {
                 if (dotNetRef) dotNetRef.invokeMethodAsync('OnReverseGeocodeResult', '');
             });

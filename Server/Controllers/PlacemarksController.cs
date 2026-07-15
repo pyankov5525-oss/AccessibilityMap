@@ -65,10 +65,32 @@ public class PlacemarksController : ControllerBase
 
         if (nearest == null)
         {
-            return NotFound();
+            // Нет ближайшей метки в радиусе 50 м — это нормально (не дубль).
+            // Возвращаем 200 с id=0, чтобы в консоли браузера не было шума 404.
+            return Ok(new { id = 0 });
         }
 
         return Ok(ToDto(nearest.Placemark));
+    }
+
+    // Метки «на удержании»: неодобренные (pending/rejected), ещё не удалённые по сроку.
+    // Доступно управляющим/разработчикам, чтобы «вернуть» при ошибочном нажатии.
+    [HttpGet("holds")]
+    [Authorize(Roles = "Manager,Developer")]
+    public async Task<IActionResult> GetHolds()
+    {
+        try
+        {
+            var now = DateTime.UtcNow;
+            var holds = await _db.Placemarks
+                .Where(p => p.VerificationStatus != "approved" && p.ExpiresAt != null && p.ExpiresAt > now)
+                .ToListAsync();
+            return Ok(holds.Select(ToDto).ToList());
+        }
+        catch
+        {
+            return Ok(new List<object>());
+        }
     }
 
     [HttpPost]
@@ -80,8 +102,23 @@ public class PlacemarksController : ControllerBase
         }
 
         placemark.CreatedAt = DateTime.UtcNow;
+        // Неодобренные метки живут в БД ~сутки, затем авто-удаляются фоновой службой.
+        placemark.ExpiresAt = DateTime.UtcNow.AddHours(24);
         _db.Placemarks.Add(placemark);
         await _db.SaveChangesAsync();
+        // Лог — «лучшее усилие»: если таблица ещё не создана (старый файл БД), не падаем.
+        try
+        {
+            _db.ActivityLogs.Add(new ActivityLog
+            {
+                Type = "placemark",
+                UserName = User.Identity?.Name,
+                Description = $"Добавлена метка «{placemark.Name}» ({placemark.Address})",
+                IpAddress = HttpContext?.Connection?.RemoteIpAddress?.ToString()
+            });
+            await _db.SaveChangesAsync();
+        }
+        catch { }
         return Ok(ToDto(placemark));
     }
 
@@ -147,8 +184,27 @@ public class PlacemarksController : ControllerBase
             return NotFound();
         }
 
+        _db.ActivityLogs.Add(new ActivityLog
+        {
+            Type = "action",
+            UserName = User.Identity?.Name,
+            Description = $"Удалена метка «{placemark.Name}»",
+            IpAddress = HttpContext?.Connection?.RemoteIpAddress?.ToString()
+        });
         _db.Placemarks.Remove(placemark);
         await _db.SaveChangesAsync();
+        try
+        {
+            _db.ActivityLogs.Add(new ActivityLog
+            {
+                Type = "action",
+                UserName = User.Identity?.Name,
+                Description = $"Удалена метка «{placemark.Name}»",
+                IpAddress = HttpContext?.Connection?.RemoteIpAddress?.ToString()
+            });
+            await _db.SaveChangesAsync();
+        }
+        catch { }
         return Ok();
     }
 
@@ -253,6 +309,18 @@ public class PlacemarksController : ControllerBase
 
         p.VerificationStatus = model.Status;
         await _db.SaveChangesAsync();
+        try
+        {
+            _db.ActivityLogs.Add(new ActivityLog
+            {
+                Type = "action",
+                UserName = User.Identity?.Name,
+                Description = $"Проверка метки «{p.Name}»: {model.Status}",
+                IpAddress = HttpContext?.Connection?.RemoteIpAddress?.ToString()
+            });
+            await _db.SaveChangesAsync();
+        }
+        catch { }
         return Ok(ToDto(p));
     }
 
@@ -276,6 +344,7 @@ public class PlacemarksController : ControllerBase
         PhotoUrl = string.IsNullOrEmpty(p.PhotoPath) ? null : "/api/photos/" + p.PhotoPath,
         PhotoPath = p.PhotoPath,
         VerificationStatus = p.VerificationStatus,
+        ExpiresAt = p.ExpiresAt,
         Scores = new
         {
             Entrance = p.ScoreEntrance,

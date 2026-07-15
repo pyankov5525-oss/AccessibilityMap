@@ -12,6 +12,10 @@
             <NavLink class="nav-link" href="verify">Проверка</NavLink>
             <NavLink class="nav-link" href="users">Пользователи</NavLink>
         }
+        @if (Auth.Role == "Developer")
+        {
+            <NavLink class="nav-link" href="logs">Журнал</NavLink>
+        }
     </nav>
     <div class="user-box">
         <span class="muted">@Auth.UserName · @RoleRu</span>

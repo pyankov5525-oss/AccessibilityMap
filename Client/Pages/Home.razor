@@ -2,6 +2,7 @@
 @inject HttpClient Http
 @inject IJSRuntime JS
 @inject NavigationManager Navigation
+@inject AccessibilityMap.Services.AuthState Auth
 @implements IDisposable
 
 <div class="map-page">
@@ -28,6 +29,10 @@
     @if (accessibilityMode)
     {
         <div class="map-banner">♿ Режим доступности включён — кликните по карте, чтобы добавить объект. Ещё раз нажмите «♿ Доступность», чтобы выйти.</div>
+    }
+    else
+    {
+        <div class="map-hint">Включите кнопку «♿ Доступность», чтобы увидеть и добавить метки доступности.</div>
     }
 
     @if (showForm)
@@ -108,6 +113,7 @@
     private bool isError = false;
     private DotNetObjectReference<Home>? dotNetRef;
     private bool accessibilityMode = false;
+    private bool verifyMode = false;
 
     private int totalCount = 0;
     private int greenCount = 0;
@@ -134,15 +140,31 @@
     {
         if (firstRender)
         {
-            dotNetRef = DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("setDotNetRef", dotNetRef);
-            await LoadPlacemarks();
-
-            // Глубокая ссылка со списка: /?edit=<id> открывает форму редактирования
-            var match = System.Text.RegularExpressions.Regex.Match(new Uri(Navigation.Uri).Query, @"[?&]edit=(\d+)");
-            if (match.Success && int.TryParse(match.Groups[1].Value, out int editId))
+            try
             {
-                await EditPlacemark(editId);
+                dotNetRef = DotNetObjectReference.Create(this);
+                await JS.InvokeVoidAsync("setDotNetRef", dotNetRef);
+                await JS.InvokeVoidAsync("setCanVerify", Auth.Role == "Developer" || Auth.Role == "Manager");
+                await LoadPlacemarks();
+
+                var query = new Uri(Navigation.Uri).Query;
+                var editMatch = System.Text.RegularExpressions.Regex.Match(query, @"[?&]edit=(\d+)");
+                if (editMatch.Success && int.TryParse(editMatch.Groups[1].Value, out int editId))
+                {
+                    await EditPlacemark(editId);
+                }
+
+                // Глубокая ссылка из «Проверки»: /?focus=<id> центрирует карту на метке
+                var focusMatch = System.Text.RegularExpressions.Regex.Match(query, @"[?&]focus=(\d+)");
+                if (focusMatch.Success && int.TryParse(focusMatch.Groups[1].Value, out int focusId))
+                {
+                    await Task.Delay(900);
+                    await JS.InvokeVoidAsync("focusPlacemark", focusId);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Home init ошибка: " + ex.Message);
             }
         }
     }
@@ -166,6 +188,13 @@
     }
 
     [JSInvokable]
+    public void OnVerifyModeChanged(bool enabled)
+    {
+        verifyMode = enabled;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
     public async Task OnMapClickWithCoords(double lat, double lon)
     {
         try
@@ -178,7 +207,7 @@
             if (nearestResponse.IsSuccessStatusCode)
             {
                 var existing = await nearestResponse.Content.ReadFromJsonAsync<PlacemarkData>();
-                if (existing != null)
+                if (existing != null && existing.Id > 0)
                 {
                     await JS.InvokeVoidAsync("openBalloon", existing.Id);
                     return;

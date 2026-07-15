@@ -1,0 +1,95 @@
+@page "/logs"
+@inject HttpClient Http
+@inject AccessibilityMap.Services.AuthState Auth
+
+<h3>Журнал действий (разработчик)</h3>
+
+<div class="subtabs">
+    <button class="subtab @(tab == "login" ? "subtab-active" : "")" @onclick="@(() => SetTab("login"))">Входы</button>
+    <button class="subtab @(tab == "placemark" ? "subtab-active" : "")" @onclick="@(() => SetTab("placemark"))">Постановка меток</button>
+    <button class="subtab @(tab == "action" ? "subtab-active" : "")" @onclick="@(() => SetTab("action"))">Действия</button>
+</div>
+
+@if (loading)
+{
+    <p>Загрузка...</p>
+}
+else
+{
+    <div class="page">
+        <table class="places-table">
+            <thead>
+                <tr><th>Время</th><th>Пользователь</th><th>Действие</th><th>IP</th></tr>
+            </thead>
+            <tbody>
+            @foreach (var l in logs)
+            {
+                <tr>
+                    <td class="muted">@FormatTime(l.Timestamp)</td>
+                    <td>@l.UserName</td>
+                    <td>@l.Description</td>
+                    <td class="muted">@l.IpAddress</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        @if (logs.Count == 0)
+        {
+            <p class="muted">Записей нет.</p>
+        }
+    </div>
+}
+
+@code {
+    private List<LogRow> logs = new();
+    private string tab = "login";
+    private bool loading = true;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            var resp = await Http.GetAsync("/api/logs?type=" + tab);
+            if (resp.IsSuccessStatusCode)
+            {
+                logs = await resp.Content.ReadFromJsonAsync<List<LogRow>>() ?? new List<LogRow>();
+            }
+            else
+            {
+                logs = new List<LogRow>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Logs.Load ошибка: " + ex.Message);
+            logs = new List<LogRow>();
+        }
+        loading = false;
+        StateHasChanged();
+    }
+
+    private async Task SetTab(string t)
+    {
+        tab = t;
+        loading = true;
+        await Load();
+    }
+
+    private string FormatTime(DateTime ts)
+    {
+        try { return ts.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss"); }
+        catch { return ts.ToString(); }
+    }
+
+    public class LogRow
+    {
+        public int Id { get; set; }
+        public DateTime Timestamp { get; set; }
+        public string Type { get; set; } = "";
+        public string? UserName { get; set; }
+        public string Description { get; set; } = "";
+        public string? IpAddress { get; set; }
+    }
+}

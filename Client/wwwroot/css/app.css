@@ -350,3 +350,96 @@ h1, h2, h3, h4, h5, h6 { margin: 0 0 8px; font-weight: 600; }
   align-items: center;
   gap: 10px;
 }
+
+/* Подсказка, когда режим доступности выключен (п.3) */
+.map-hint {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  max-width: 90%;
+  text-align: center;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: rgba(36, 44, 54, .92);
+  color: var(--text-dim);
+  font-size: 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
+}
+
+/* Страница ошибки (ErrorBoundary) */
+.error-page {
+  max-width: 600px;
+  margin: 60px auto;
+  text-align: center;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 32px;
+}
+.error-page h3 { color: var(--red); }
+
+/* Подвкладки (Проверка / Журнал) */
+.subtabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.subtab {
+  padding: 7px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text-dim);
+  font-size: 14px;
+  font-weight: 600;
+}
+.subtab:hover { color: var(--text); }
+.subtab-active { color: #fff; border-color: var(--accent); background: rgba(59,130,246,.2); }
+
+/* Карточка деталей метки (вкладка Проверка) */
+.detail-panel {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  max-width: 560px;
+}
+.detail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.detail-photo {
+  display: block;
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 8px 0;
+  border: 1px solid var(--border);
+}
+.score-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 18px;
+  margin: 10px 0;
+  font-size: 14px;
+}
+.score-grid div {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px dashed var(--border);
+  padding-bottom: 4px;
+}
+.score-grid span { color: var(--text-dim); }
+.score-grid b { color: var(--text); }
+.detail-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
