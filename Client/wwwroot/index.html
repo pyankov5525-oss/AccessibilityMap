@@ -50,6 +50,10 @@
 
         function updatePlacemarks(placemarks) {
             placemarksData = placemarks || [];
+            if (typeof ymaps === 'undefined' || typeof ymaps.ready !== 'function') {
+                setTimeout(function () { updatePlacemarks(placemarks); }, 400);
+                return;
+            }
             ymaps.ready(function () {
                 if (!map) {
                     map = new ymaps.Map("map", {
@@ -86,6 +90,39 @@
                             dotNetRef.invokeMethodAsync('OnMapClickWithCoords', coords[0], coords[1]);
                         }
                     });
+
+                    // Кастомный поиск через наш геокодер (создаём только когда карта уже есть)
+                    var searchButton = new ymaps.control.Button({
+                        data: { title: 'Поиск' },
+                        options: {
+                            maxWidth: 250,
+                            layout: ymaps.templateLayoutFactory.createClass(
+                                '<div style="display:flex; gap:4px; padding:4px; background:#fff; border-radius:4px; box-shadow:0 1px 3px rgba(0,0,0,0.2);">' +
+                                '<input id="customSearchInput" type="text" placeholder="Поиск адреса..." style="padding:4px 8px; border:1px solid #ccc; border-radius:3px; font-size:12px; width:180px;">' +
+                                '<button id="customSearchBtn" style="padding:4px 8px; background:#2196F3; color:#fff; border:none; border-radius:3px; cursor:pointer; font-size:12px;">🔍</button>' +
+                                '</div>'
+                            )
+                        }
+                    });
+                    map.controls.add(searchButton, { float: 'left', position: { top: 10, left: 10 } });
+
+                    setTimeout(function () {
+                        var btn = document.getElementById('customSearchBtn');
+                        var input = document.getElementById('customSearchInput');
+                        if (btn && input) {
+                            btn.onclick = function () {
+                                var query = input.value.trim();
+                                if (query && dotNetRef) {
+                                    dotNetRef.invokeMethodAsync('SearchAddress', query);
+                                }
+                            };
+                            input.onkeydown = function (e) {
+                                if (e.key === 'Enter') {
+                                    btn.click();
+                                }
+                            };
+                        }
+                    }, 500);
                 }
                 showPlacemarks();
                 updateCounter();
@@ -208,45 +245,6 @@
                 dotNetRef.invokeMethodAsync('EditPlacemark', id);
             }
         }
-
-        // Кастомный поиск через наш геокодер
-        var searchButton = new ymaps.control.Button({
-            data: { title: 'Поиск' },
-            options: {
-                maxWidth: 250,
-                layout: ymaps.templateLayoutFactory.createClass(
-                    '<div style="display:flex; gap:4px; padding:4px; background:#fff; border-radius:4px; box-shadow:0 1px 3px rgba(0,0,0,0.2);">' +
-                    '<input id="customSearchInput" type="text" placeholder="Поиск адреса..." style="padding:4px 8px; border:1px solid #ccc; border-radius:3px; font-size:12px; width:180px;">' +
-                    '<button id="customSearchBtn" style="padding:4px 8px; background:#2196F3; color:#fff; border:none; border-radius:3px; cursor:pointer; font-size:12px;">🔍</button>' +
-                    '</div>'
-                )
-            }
-        });
-
-        searchButton.events.add('click', function (e) {
-            // Предотвращаем всплытие
-        });
-
-        map.controls.add(searchButton, { float: 'left', position: { top: 10, left: 10 } });
-
-        // После добавления контрола вешаем обработчик
-        setTimeout(function () {
-            var btn = document.getElementById('customSearchBtn');
-            var input = document.getElementById('customSearchInput');
-            if (btn && input) {
-                btn.onclick = function () {
-                    var query = input.value.trim();
-                    if (query && dotNetRef) {
-                        dotNetRef.invokeMethodAsync('SearchAddress', query);
-                    }
-                };
-                input.onkeydown = function (e) {
-                    if (e.key === 'Enter') {
-                        btn.click();
-                    }
-                };
-            }
-        }, 500);
 
         // Клиентский геокодинг через Яндекс.Карты (там валидный JS-ключ)
         function geocodeAddressJs(query) {

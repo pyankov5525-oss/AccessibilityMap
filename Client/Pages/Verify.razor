@@ -40,8 +40,26 @@ else
 
     private async Task Load()
     {
-        items = await Http.GetFromJsonAsync<List<PlacemarkData>>("/api/placemarks");
-        StateHasChanged();
+        try
+        {
+            var resp = await Http.GetAsync("/api/placemarks");
+            if (!resp.IsSuccessStatusCode)
+            {
+                var err = await resp.Content.ReadAsStringAsync();
+                Console.WriteLine($"API /api/placemarks вернул {resp.StatusCode}. Тело: {err.Substring(0, Math.Min(200, err.Length))}");
+                items = new List<PlacemarkData>();
+                StateHasChanged();
+                return;
+            }
+            items = await resp.Content.ReadFromJsonAsync<List<PlacemarkData>>();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Verify.Load ошибка: " + ex.Message);
+            items = new List<PlacemarkData>();
+            StateHasChanged();
+        }
     }
 
     private async Task SetStatus(int id, string status)

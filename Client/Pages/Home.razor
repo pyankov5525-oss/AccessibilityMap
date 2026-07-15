@@ -290,8 +290,22 @@
 
     private async Task LoadPlacemarks()
     {
-        var placemarks = await Http.GetFromJsonAsync<List<PlacemarkData>>("/api/placemarks");
-        await JS.InvokeVoidAsync("updatePlacemarks", placemarks ?? new List<PlacemarkData>());
+        try
+        {
+            var resp = await Http.GetAsync("/api/placemarks");
+            if (!resp.IsSuccessStatusCode)
+            {
+                var err = await resp.Content.ReadAsStringAsync();
+                Console.WriteLine($"API /api/placemarks вернул {resp.StatusCode}. Тело (первые 200 симв.): {err.Substring(0, Math.Min(200, err.Length))}");
+                return;
+            }
+            var placemarks = await resp.Content.ReadFromJsonAsync<List<PlacemarkData>>();
+            await JS.InvokeVoidAsync("updatePlacemarks", placemarks ?? new List<PlacemarkData>());
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("LoadPlacemarks ошибка: " + ex.Message);
+        }
     }
 
     private async Task OnFileSelected(InputFileChangeEventArgs e)
