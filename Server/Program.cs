@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Npgsql;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -27,7 +28,18 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     {
         // Neon/Supabase выдают postgres:// — Npgsql нужен префикс postgresql://
         var pg = connectionString.Replace("postgres://", "postgresql://", StringComparison.OrdinalIgnoreCase);
-        options.UseNpgsql(pg);
+
+        // Облачные базы (Supabase/Neon) требуют SSL. По умолчанию Npgsql стоит
+        // SslMode=Prefer — принудительно включаем Require, если пользователь
+        // не задал режим SSL сам. Для локального Postgres без SSL это не сработает,
+        // но для Supabase/Neon обязательно.
+        var pgBuilder = new NpgsqlConnectionStringBuilder(pg);
+        if (pgBuilder.SslMode == SslMode.Prefer || pgBuilder.SslMode == SslMode.Disable)
+        {
+            pgBuilder.SslMode = SslMode.Require;
+        }
+
+        options.UseNpgsql(pgBuilder.ConnectionString);
     }
     else
     {
