@@ -64,7 +64,7 @@ else
                     <td>
                         @if (Auth.Role == "Developer")
                         {
-                            <select class="form-control form-control-sm" @onchange="e => ChangeRole(u.Id, e.Value?.ToString() ?? "")">
+                            <select class="form-control form-control-sm" @onchange="e => ChangeRoleSafe(u.Id, e.Value)">
                                 @foreach (var r in new[] { "Developer", "Manager", "Volunteer" })
                                 {
                                     @if (r == u.Role)
@@ -103,7 +103,7 @@ else
                     <td>
                         @if (Auth.Role == "Developer")
                         {
-                            <select class="form-control form-control-sm" @onchange="e => ChangeRole(u.Id, e.Value?.ToString() ?? "")">
+                            <select class="form-control form-control-sm" @onchange="e => ChangeRoleSafe(u.Id, e.Value)">
                                 @foreach (var r in new[] { "Developer", "Manager", "Volunteer" })
                                 {
                                     @if (r == u.Role)
@@ -142,7 +142,7 @@ else
                     <td>
                         @if (Auth.Role == "Developer")
                         {
-                            <select class="form-control form-control-sm" @onchange="e => ChangeRole(u.Id, e.Value?.ToString() ?? "")">
+                            <select class="form-control form-control-sm" @onchange="e => ChangeRoleSafe(u.Id, e.Value)">
                                 @foreach (var r in new[] { "Developer", "Manager", "Volunteer" })
                                 {
                                     @if (r == u.Role)
@@ -204,9 +204,15 @@ else
         }
     }
 
+    private async Task ChangeRoleSafe(string id, object? value)
+    {
+        var role = value?.ToString() ?? "";
+        if (string.IsNullOrEmpty(role)) return;
+        await ChangeRole(id, role);
+    }
+
     private async Task ChangeRole(string id, string role)
     {
-        if (string.IsNullOrEmpty(role)) return;
         var resp = await Http.PostAsJsonAsync($"/api/auth/{id}/role", new { Role = role });
         if (!resp.IsSuccessStatusCode)
         {
