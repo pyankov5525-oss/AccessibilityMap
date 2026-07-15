@@ -78,7 +78,7 @@
                     accessibilityButton.events.add('click', function () {
                         toggleAccessibilityMode();
                     });
-                    map.controls.add(accessibilityButton, { float: 'right', position: { top: 10, right: 10 } });
+                    map.controls.add(accessibilityButton, { float: 'right', position: { top: 70, right: 10 } });
 
                     map.events.add('click', function (e) {
                         if (accessibilityMode && dotNetRef) {
@@ -119,7 +119,7 @@
             if (!map) return;
             map.geoObjects.removeAll();
             placemarkObjects = {};
-            if (accessibilityMode && placemarksData.length > 0) {
+            if (placemarksData.length > 0) {
                 var filtered = placemarksData;
                 if (currentFilter !== 'all') {
                     filtered = placemarksData.filter(function (p) { return p.level === currentFilter; });

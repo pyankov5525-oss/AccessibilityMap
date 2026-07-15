@@ -1,7 +1,8 @@
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using System.Net.Http;
-using AccessibilityMap.Client.Services;
+using AccessibilityMap;
+using AccessibilityMap.Services;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 

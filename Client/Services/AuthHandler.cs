@@ -1,7 +1,7 @@
 using System.Net.Http;
 using System.Net.Http.Headers;
 
-namespace AccessibilityMap.Client.Services;
+namespace AccessibilityMap.Services;
 
 public class AuthHandler : DelegatingHandler
 {

@@ -1,4 +1,4 @@
-namespace AccessibilityMap.Client.Services;
+namespace AccessibilityMap.Services;
 
 public class AuthState
 {
