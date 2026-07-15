@@ -31,6 +31,6 @@
     private async Task Logout()
     {
         try { await Http.PostAsync("/api/auth/logout", null); } catch { }
-        Auth.Clear();
+        await Auth.ClearAsync();
     }
 }

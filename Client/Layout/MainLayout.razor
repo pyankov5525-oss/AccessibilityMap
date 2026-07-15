@@ -17,6 +17,11 @@ else
 }
 
 @code {
-    protected override void OnInitialized() => Auth.OnChange += StateHasChanged;
+    protected override async Task OnInitializedAsync()
+    {
+        await Auth.RestoreAsync();
+        Auth.OnChange += StateHasChanged;
+    }
+
     public void Dispose() => Auth.OnChange -= StateHasChanged;
 }

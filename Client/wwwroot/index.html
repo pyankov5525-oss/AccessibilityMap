@@ -60,7 +60,6 @@
                         center: [51.672, 39.192],
                         zoom: 12,
                         controls: [
-                            'searchControl',
                             'zoomControl',
                             'typeSelector',
                             'fullscreenControl',
@@ -82,7 +81,7 @@
                     accessibilityButton.events.add('click', function () {
                         toggleAccessibilityMode();
                     });
-                    map.controls.add(accessibilityButton, { float: 'right', position: { top: 70, right: 10 } });
+                    map.controls.add(accessibilityButton, { float: 'right', position: { top: 55, right: 10 } });
 
                     map.events.add('click', function (e) {
                         if (accessibilityMode && dotNetRef) {
@@ -162,6 +161,9 @@
                     filtered = placemarksData.filter(function (p) { return p.level === currentFilter; });
                 }
                 filtered.forEach(function (p) {
+                    var isPending = p.verificationStatus && p.verificationStatus !== 'approved';
+                    var markerColor = isPending ? '#9E9E9E' : getLevelColor(p.level);
+                    var markerIcon = isPending ? 'grey' : (p.level || 'red');
                     var scores = '';
                     if (p.scores) {
                         scores =
@@ -198,7 +200,7 @@
                         balloonContent: content
                     }, {
                         iconLayout: 'default#image',
-                        iconImageHref: 'https://cdn.jsdelivr.net/gh/pointhi/leaflet-color-markers@master/img/marker-icon-2x-' + p.level + '.png',
+                        iconImageHref: 'https://cdn.jsdelivr.net/gh/pointhi/leaflet-color-markers@master/img/marker-icon-2x-' + markerIcon + '.png',
                         iconImageSize: [25, 41],
                         iconImageOffset: [-12, -41]
                     });
@@ -244,6 +246,11 @@
                 if (pm && pm.balloon) pm.balloon.close();
                 dotNetRef.invokeMethodAsync('EditPlacemark', id);
             }
+        }
+
+        function destroyMap() {
+            try { if (map) { map.destroy(); } } catch (e) {}
+            map = null;
         }
 
         // Клиентский геокодинг через Яндекс.Карты (там валидный JS-ключ)

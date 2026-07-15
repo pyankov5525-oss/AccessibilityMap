@@ -391,6 +391,7 @@
     public void Dispose()
     {
         dotNetRef?.Dispose();
+        try { JS.InvokeVoidAsync("destroyMap"); } catch { }
     }
 
     public class PhotoUploadResult

@@ -228,7 +228,7 @@ h1, h2, h3, h4, h5, h6 { margin: 0 0 8px; font-weight: 600; }
   top: 12px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 10;
+  z-index: 100;
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
@@ -262,14 +262,14 @@ h1, h2, h3, h4, h5, h6 { margin: 0 0 8px; font-weight: 600; }
 /* Статистика слева снизу */
 .map-stats {
   position: absolute;
-  bottom: 12px;
+  bottom: 36px;
   left: 12px;
-  z-index: 10;
+  z-index: 100;
   display: flex;
   gap: 8px;
   padding: 8px;
   border-radius: 12px;
-  background: rgba(22, 28, 36, .85);
+  background: rgba(22, 28, 36, .92);
   backdrop-filter: blur(4px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
 }
@@ -280,7 +280,7 @@ h1, h2, h3, h4, h5, h6 { margin: 0 0 8px; font-weight: 600; }
   bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 10;
+  z-index: 100;
   max-width: 90%;
   text-align: center;
   padding: 10px 16px;
@@ -299,7 +299,7 @@ h1, h2, h3, h4, h5, h6 { margin: 0 0 8px; font-weight: 600; }
   bottom: 0;
   width: 400px;
   max-width: 92%;
-  z-index: 20;
+  z-index: 200;
   padding: 12px;
   overflow: auto;
   background: rgba(15, 20, 25, .55);

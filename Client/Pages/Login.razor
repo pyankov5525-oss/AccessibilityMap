@@ -37,7 +37,7 @@
                 var result = await response.Content.ReadFromJsonAsync<LoginResult>();
                 if (result != null)
                 {
-                    Auth.Set(result.Token, result.UserName, result.Role);
+                    await Auth.SetAsync(result.Token, result.UserName, result.Role);
                 }
             }
             else
