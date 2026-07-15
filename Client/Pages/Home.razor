@@ -15,9 +15,6 @@
         <button class="chip chip-red @(currentFilter == "red" ? "chip-active" : "")" @onclick="SetFilterRed">🔴 Недоступно</button>
     </div>
 
-    @* Кнопка добавления — поверх карты (справа сверху) *@
-    <button class="map-add-btn" @onclick="StartAdd">➕ Добавить объект</button>
-
     @if (showCounter)
     {
         <div class="map-stats">
@@ -30,7 +27,7 @@
 
     @if (accessibilityMode)
     {
-        <div class="map-banner">♿ Режим доступности включён — кликните по карте, чтобы добавить объект. Ещё раз нажмите «➕ Добавить объект», чтобы выйти.</div>
+        <div class="map-banner">♿ Режим доступности включён — кликните по карте, чтобы добавить объект. Ещё раз нажмите «♿ Доступность», чтобы выйти.</div>
     }
 
     @if (showForm)
@@ -133,9 +130,6 @@
         await JS.InvokeVoidAsync("setFilter", filter);
     }
 
-    // Включает/выключает «режим доступности» (добавление объекта кликом по карте)
-    private async Task StartAdd() => await JS.InvokeVoidAsync("toggleAccessibilityMode");
-
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -191,25 +185,17 @@
                 }
             }
 
-            // Получаем адрес через сервер
-            var address = "";
-            try
-            {
-                var geoResponse = await Http.GetFromJsonAsync<GeocodingResponse>($"/api/placemarks/reverse-geocode?lat={latStr}&lon={lonStr}");
-                address = geoResponse?.Address ?? "";
-            }
-            catch { }
-
+            // Открываем форму; адрес подставим через обратный геокодинг на клиенте
             newPlacemark = new NewPlacemark
             {
                 Latitude = lat,
-                Longitude = lon,
-                Address = address
+                Longitude = lon
             };
             editingId = null;
             showForm = true;
             message = "";
             StateHasChanged();
+            await JS.InvokeVoidAsync("reverseGeocodeJs", lat, lon);
         }
         catch { }
     }
@@ -263,56 +249,41 @@
             return;
         }
 
-        try
+        // Геокодинг выполняется на клиенте через Яндекс.Карты (там валидный JS-ключ)
+        await JS.InvokeVoidAsync("geocodeAddressJs", query);
+    }
+
+    [JSInvokable]
+    public async Task OnGeocodeResult(double lat, double lon, string text)
+    {
+        if (string.IsNullOrWhiteSpace(text) || (Math.Abs(lat) < 1e-6 && Math.Abs(lon) < 1e-6))
         {
-            var json = await Http.GetStringAsync($"/api/placemarks/geocode?address={Uri.EscapeDataString(query)}");
-            using var doc = System.Text.Json.JsonDocument.Parse(json);
-            var members = doc.RootElement
-                .GetProperty("response")
-                .GetProperty("GeoObjectCollection")
-                .GetProperty("featureMember");
-
-            if (members.GetArrayLength() == 0)
-            {
-                message = "Ничего не найдено";
-                isError = true;
-                StateHasChanged();
-                return;
-            }
-
-            var go = members[0].GetProperty("GeoObject");
-            var pos = go.GetProperty("Point").GetProperty("pos").GetString();
-            var text = go.GetProperty("metaDataProperty").GetProperty("GeocoderMetaData").GetProperty("text").GetString() ?? query;
-            var parts = (pos ?? "").Split(' ');
-
-            if (parts.Length == 2 &&
-                double.TryParse(parts[0], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double lon) &&
-                double.TryParse(parts[1], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double lat))
-            {
-                await JS.InvokeVoidAsync("moveMapTo", lat, lon);
-                newPlacemark = new NewPlacemark
-                {
-                    Latitude = lat,
-                    Longitude = lon,
-                    Address = text
-                };
-                editingId = null;
-                showForm = true;
-                message = "Заполните данные объекта";
-                isError = false;
-                StateHasChanged();
-            }
-            else
-            {
-                message = "Не удалось определить координаты";
-                isError = true;
-                StateHasChanged();
-            }
-        }
-        catch (Exception ex)
-        {
-            message = "Ошибка поиска: " + ex.Message;
+            message = "Ничего не найдено";
             isError = true;
+            StateHasChanged();
+            return;
+        }
+
+        await JS.InvokeVoidAsync("moveMapTo", lat, lon);
+        newPlacemark = new NewPlacemark
+        {
+            Latitude = lat,
+            Longitude = lon,
+            Address = text
+        };
+        editingId = null;
+        showForm = true;
+        message = "Заполните данные объекта";
+        isError = false;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnReverseGeocodeResult(string text)
+    {
+        if (!string.IsNullOrEmpty(text))
+        {
+            newPlacemark.Address = text;
             StateHasChanged();
         }
     }
@@ -406,11 +377,6 @@
     public void Dispose()
     {
         dotNetRef?.Dispose();
-    }
-
-    public class GeocodingResponse
-    {
-        public string Address { get; set; } = "";
     }
 
     public class PhotoUploadResult

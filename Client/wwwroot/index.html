@@ -69,16 +69,16 @@
                     var accessibilityButton = new ymaps.control.Button({
                         data: { title: 'Доступность' },
                         options: {
-                            maxWidth: 150,
+                            maxWidth: 220,
                             layout: ymaps.templateLayoutFactory.createClass(
-                                '<button style="padding:5px 10px; font-size:12px; border:1px solid #ccc; border-radius:4px; cursor:pointer; background:#fff; color:#333; white-space:nowrap;">♿ Доступность</button>'
+                                '<button style="padding:10px 18px; font-size:15px; font-weight:600; border:2px solid #3b82f6; border-radius:8px; cursor:pointer; background:#3b82f6; color:#fff; white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,.35);">♿ Доступность</button>'
                             )
                         }
                     });
                     accessibilityButton.events.add('click', function () {
                         toggleAccessibilityMode();
                     });
-                    map.controls.add(accessibilityButton, { float: 'right', position: { top: 45, right: 10 } });
+                    map.controls.add(accessibilityButton, { float: 'right', position: { top: 10, right: 10 } });
 
                     map.events.add('click', function (e) {
                         if (accessibilityMode && dotNetRef) {
@@ -140,6 +140,8 @@
                             '</div>';
                     }
 
+                    var photo = (p.photoUrl ? '<img src="' + p.photoUrl + '" style="width:100%; max-width:230px; border-radius:6px; margin:6px 0;" />' : '');
+
                     var content =
                         '<div style="font-family:sans-serif; max-width:250px;">' +
                         '<h4 style="margin:0 0 6px 0; color:#333;">' + p.name + '</h4>' +
@@ -148,7 +150,7 @@
                         '<div style="background:' + getLevelColor(p.level) + '; color:#fff; padding:6px 10px; border-radius:4px; text-align:center; font-weight:bold; margin-bottom:8px;">' +
                         p.levelText + ' (' + p.totalScore + ' / 21 баллов)' +
                         '</div>' +
-                        (p.photoUrl ? '<img src="' + p.photoUrl + '" style="width:100%; max-width:230px; border-radius:6px; margin:6px 0;" />' : '') +
+                        photo +
                         scores +
                         (p.notes ? '<div style="font-size:11px; color:#888; margin-top:8px; font-style:italic;">📝 ' + p.notes + '</div>' : '') +
                         '<button onclick="editPlacemark(' + p.id + ')" style="padding:4px 10px; background:#2196F3; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px; margin-right:4px;">✏️ Изменить</button>' +
@@ -246,6 +248,39 @@
             }
         }, 500);
 
+        // Клиентский геокодинг через Яндекс.Карты (там валидный JS-ключ)
+        function geocodeAddressJs(query) {
+            if (!window.ymaps || !ymaps.geocode) {
+                if (dotNetRef) dotNetRef.invokeMethodAsync('OnGeocodeResult', 0, 0, '');
+                return;
+            }
+            ymaps.geocode(query, { results: 1 }).then(function (res) {
+                var go = res.geoObjects.get(0);
+                if (!go) {
+                    if (dotNetRef) dotNetRef.invokeMethodAsync('OnGeocodeResult', 0, 0, '');
+                    return;
+                }
+                var coords = go.geometry.getCoordinates();
+                var text = go.getAddressLine ? go.getAddressLine() : go.properties.get('text');
+                if (dotNetRef) dotNetRef.invokeMethodAsync('OnGeocodeResult', coords[0], coords[1], text || '');
+            }).catch(function () {
+                if (dotNetRef) dotNetRef.invokeMethodAsync('OnGeocodeResult', 0, 0, '');
+            });
+        }
+
+        function reverseGeocodeJs(lat, lon) {
+            if (!window.ymaps || !ymaps.geocode) {
+                if (dotNetRef) dotNetRef.invokeMethodAsync('OnReverseGeocodeResult', '');
+                return;
+            }
+            ymaps.geocode([lat, lon], { results: 1, kind: 'house' }).then(function (res) {
+                var go = res.geoObjects.get(0);
+                var text = go ? (go.getAddressLine ? go.getAddressLine() : go.properties.get('text')) : '';
+                if (dotNetRef) dotNetRef.invokeMethodAsync('OnReverseGeocodeResult', text || '');
+            }).catch(function () {
+                if (dotNetRef) dotNetRef.invokeMethodAsync('OnReverseGeocodeResult', '');
+            });
+        }
     </script>
 </body>
 
