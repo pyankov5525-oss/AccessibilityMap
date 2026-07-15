@@ -52,5 +52,7 @@ public class PlacemarkModel
 
     public string Notes { get; set; } = string.Empty;
     public string? PhotoPath { get; set; }
+    // Статус проверки: pending (на проверке) | approved (одобрено) | rejected (отклонено)
+    public string VerificationStatus { get; set; } = "pending";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

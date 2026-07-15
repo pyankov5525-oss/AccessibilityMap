@@ -4,6 +4,7 @@ using AccessibilityMap.Server.Data;
 using AccessibilityMap.Server.Models;
 using Microsoft.Extensions.Http;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Authorization;
 using System.Globalization;
 using System.IO;
 
@@ -11,6 +12,7 @@ namespace AccessibilityMap.Server.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class PlacemarksController : ControllerBase
 {
     private readonly AppDbContext _db;
@@ -211,6 +213,7 @@ public class PlacemarksController : ControllerBase
     }
 
     [HttpGet("/api/photos/{fileName}")]
+    [AllowAnonymous]
     public IActionResult GetPhoto(string fileName)
     {
         fileName = Path.GetFileName(fileName);
@@ -239,6 +242,25 @@ public class PlacemarksController : ControllerBase
         return PhysicalFile(fullPath, contentType);
     }
 
+    [HttpPost("{id}/verify")]
+    [Authorize(Roles = "Manager,Developer")]
+    public async Task<IActionResult> Verify(int id, [FromBody] VerifyModel model)
+    {
+        var p = await _db.Placemarks.FindAsync(id);
+        if (p == null) return NotFound();
+        if (model.Status != "approved" && model.Status != "rejected")
+            return BadRequest(new { error = "Статус должен быть approved или rejected" });
+
+        p.VerificationStatus = model.Status;
+        await _db.SaveChangesAsync();
+        return Ok(ToDto(p));
+    }
+
+    public class VerifyModel
+    {
+        public string Status { get; set; } = "";
+    }
+
     private static object ToDto(PlacemarkModel p) => new
     {
         p.Id,
@@ -253,6 +275,7 @@ public class PlacemarksController : ControllerBase
         p.Notes,
         PhotoUrl = string.IsNullOrEmpty(p.PhotoPath) ? null : "/api/photos/" + p.PhotoPath,
         PhotoPath = p.PhotoPath,
+        VerificationStatus = p.VerificationStatus,
         Scores = new
         {
             Entrance = p.ScoreEntrance,
