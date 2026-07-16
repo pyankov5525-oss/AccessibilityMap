@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Collections.Concurrent;
 using AccessibilityMap.Server.Data;
 using AccessibilityMap.Server.Models;
 
@@ -37,6 +38,8 @@ public class AuthController : ControllerBase
     {
         public string Login { get; set; } = "";
         public string Password { get; set; } = "";
+        public string CaptchaToken { get; set; } = "";
+        public string CaptchaAnswer { get; set; } = "";
     }
 
     public class CreateModel
@@ -50,6 +53,18 @@ public class AuthController : ControllerBase
         var user = await _userManager.FindByNameAsync(model.Login);
         if (user == null)
             return Unauthorized(new { error = "Неверный логин или пароль" });
+
+        // Защита: заблокированные пользователи не могут войти в систему.
+        if (user.Status == "blocked")
+            return Unauthorized(new { error = "Ваш аккаунт заблокирован администратором" });
+
+        // Капча: защита формы входа от автоматического подбора пароля ботами.
+        if (string.IsNullOrEmpty(model.CaptchaToken) || string.IsNullOrEmpty(model.CaptchaAnswer) ||
+            !_captchas.TryRemove(model.CaptchaToken, out var cap) || cap.Expiry < DateTime.UtcNow ||
+            cap.Answer != model.CaptchaAnswer.Trim())
+        {
+            return Unauthorized(new { error = "Неверный ответ на проверку (капча)" });
+        }
 
         var result = await _signInManager.CheckPasswordSignInAsync(user, model.Password, false);
         if (!result.Succeeded)
@@ -79,7 +94,16 @@ public class AuthController : ControllerBase
         var user = await _userManager.GetUserAsync(User);
         if (user == null) return Unauthorized();
         var roles = await _userManager.GetRolesAsync(user);
-        return Ok(new { userName = user.UserName, role = roles.FirstOrDefault(), isAuthenticated = true });
+        return Ok(new
+        {
+            userName = user.UserName,
+            role = roles.FirstOrDefault(),
+            isAuthenticated = true,
+            fullName = user.FullName,
+            dateOfBirth = user.DateOfBirth,
+            status = user.Status,
+            about = user.About
+        });
     }
 
     [HttpPost("logout")]
@@ -214,15 +238,210 @@ public class AuthController : ControllerBase
         return Ok(new { ok = true });
     }
 
+    [HttpGet("profile")]
+    [Authorize]
+    public async Task<IActionResult> GetProfile([FromQuery] string? id)
+    {
+        var current = await _userManager.GetUserAsync(User);
+        if (current == null) return Unauthorized();
+        ApplicationUser? target = current;
+        if (!string.IsNullOrEmpty(id) && id != current.Id)
+        {
+            // просмотр чужого профиля — только Developer/Manager
+            var currentRoles = await _userManager.GetRolesAsync(current);
+            if (!currentRoles.Contains("Developer") && !currentRoles.Contains("Manager"))
+                return Forbid();
+            target = await _userManager.FindByIdAsync(id);
+            if (target == null) return NotFound();
+        }
+        var roles = await _userManager.GetRolesAsync(target);
+        return Ok(new ProfileDto
+        {
+            Id = target.Id,
+            UserName = target.UserName,
+            FullName = target.FullName,
+            DateOfBirth = target.DateOfBirth,
+            Status = target.Status,
+            About = target.About,
+            Role = roles.FirstOrDefault() ?? ""
+        });
+    }
+
+    [HttpPut("profile")]
+    [Authorize]
+    public async Task<IActionResult> UpdateProfile([FromBody] ProfileUpdateModel model)
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null) return Unauthorized();
+        user.FullName = model.FullName;
+        user.DateOfBirth = model.DateOfBirth;
+        user.About = model.About;
+        var result = await _userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+            return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
+        return Ok(new { ok = true });
+    }
+
+    [HttpPut("{id}/profile")]
+    [Authorize(Roles = "Developer,Manager")]
+    public async Task<IActionResult> UpdateProfileForUser(string id, [FromBody] ProfileUpdateModel model)
+    {
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null) return NotFound();
+        user.FullName = model.FullName;
+        user.DateOfBirth = model.DateOfBirth;
+        user.About = model.About;
+        if (!string.IsNullOrEmpty(model.Status)) user.Status = model.Status;
+        var result = await _userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+            return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
+        return Ok(new { ok = true });
+    }
+
     public class RoleModel
     {
         public string Role { get; set; } = "";
     }
 
+    public class ProfileDto
+    {
+        public string Id { get; set; } = "";
+        public string UserName { get; set; } = "";
+        public string? FullName { get; set; }
+        public string? DateOfBirth { get; set; }
+        public string? Status { get; set; }
+        public string? About { get; set; }
+        public string Role { get; set; } = "";
+    }
+
+    public class ProfileUpdateModel
+    {
+        public string? FullName { get; set; }
+        public string? DateOfBirth { get; set; }
+        public string? About { get; set; }
+        public string? Status { get; set; }
+    }
+
+    // ===== Капча (защита входа от ботов) =====
+    private static readonly ConcurrentDictionary<string, (string Answer, DateTime Expiry)> _captchas = new();
+
+    [HttpGet("captcha")]
+    [AllowAnonymous]
+    public IActionResult GetCaptcha()
+    {
+        var rnd = new Random();
+        var a = rnd.Next(1, 10);
+        var b = rnd.Next(1, 10);
+        var token = Guid.NewGuid().ToString("N");
+        _captchas[token] = ((a + b).ToString(), DateTime.UtcNow.AddMinutes(5));
+        return Ok(new { token, question = $"Сколько будет {a} + {b}?" });
+    }
+
+    // ===== Ручное создание пользователя (Dev/Manager) =====
+    [HttpPost("register")]
+    [Authorize]
+    public async Task<IActionResult> Register([FromBody] RegisterModel model)
+    {
+        if (string.IsNullOrWhiteSpace(model.Login) || string.IsNullOrWhiteSpace(model.Password))
+            return BadRequest(new { error = "Укажите логин и пароль" });
+        if (model.Password.Length < 6)
+            return BadRequest(new { error = "Пароль должен быть не короче 6 символов" });
+
+        var self = await _userManager.GetUserAsync(User);
+        var selfRoles = self == null ? new List<string>() : await _userManager.GetRolesAsync(self);
+        bool allowed;
+        if (selfRoles.Contains("Developer"))
+            allowed = true; // разработчик создаёт любую роль
+        else if (selfRoles.Contains("Manager") && (model.Role == "Volunteer" || model.Role == "Manager"))
+            allowed = true; // управляющий — только волонтёра/управляющего
+        else
+            allowed = false;
+        if (!allowed) return Forbid();
+
+        if (await _userManager.FindByNameAsync(model.Login) != null)
+            return BadRequest(new { error = "Такой логин уже занят" });
+
+        var user = new ApplicationUser { UserName = model.Login, EmailConfirmed = true, Status = "active" };
+        var result = await _userManager.CreateAsync(user, model.Password);
+        if (!result.Succeeded)
+            return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
+        await _userManager.AddToRoleAsync(user, model.Role);
+        try
+        {
+            _db.ActivityLogs.Add(new ActivityLog
+            {
+                Type = "action",
+                UserName = User.Identity?.Name,
+                Description = $"Создан пользователь {model.Login} (роль {model.Role})"
+            });
+            await _db.SaveChangesAsync();
+        }
+        catch { }
+        return Ok(new { login = model.Login, role = model.Role });
+    }
+
+    // ===== Смена пароля самому пользователю =====
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordModel model)
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null) return Unauthorized();
+        var result = await _userManager.ChangePasswordAsync(user, model.CurrentPassword, model.NewPassword);
+        if (!result.Succeeded)
+            return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
+        try
+        {
+            _db.ActivityLogs.Add(new ActivityLog { Type = "action", UserName = user.UserName, Description = "Смена пароля" });
+            await _db.SaveChangesAsync();
+        }
+        catch { }
+        return Ok(new { ok = true });
+    }
+
+    // ===== Сброс пароля администратором (Dev/Manager) =====
+    [HttpPost("{id}/reset-password")]
+    [Authorize(Roles = "Developer,Manager")]
+    public async Task<IActionResult> ResetPassword(string id, [FromBody] ResetPasswordModel model)
+    {
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null) return NotFound();
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+        var result = await _userManager.ResetPasswordAsync(user, token, model.NewPassword);
+        if (!result.Succeeded)
+            return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
+        return Ok(new { ok = true });
+    }
+
+    public class RegisterModel
+    {
+        public string Login { get; set; } = "";
+        public string Password { get; set; } = "";
+        public string Role { get; set; } = "Volunteer";
+    }
+
+    public class ChangePasswordModel
+    {
+        public string CurrentPassword { get; set; } = "";
+        public string NewPassword { get; set; } = "";
+    }
+
+    public class ResetPasswordModel
+    {
+        public string NewPassword { get; set; } = "";
+    }
+
     private string GenerateToken(ApplicationUser user, IList<string> roles)
     {
         var key = _config["Jwt:Key"] ?? "accessibility-map-dev-secret-key-1234567890";
-        var claims = new List<Claim> { new Claim(ClaimTypes.Name, user.UserName ?? "") };
+        var claims = new List<Claim>
+        {
+            // NameIdentifier обязателен: UserManager.GetUserAsync(User) ищет
+            // пользователя именно по этому claim. Без него все эндпоинты профиля
+            // возвращали 401 и клиент считал вход неуспешным.
+            new Claim(ClaimTypes.NameIdentifier, user.Id),
+            new Claim(ClaimTypes.Name, user.UserName ?? "")
+        };
         foreach (var role in roles)
             claims.Add(new Claim(ClaimTypes.Role, role));
 

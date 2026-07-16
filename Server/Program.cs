@@ -111,6 +111,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors();
+app.UseMiddleware<RateLimitMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 //app.UseHttpsRedirection();
@@ -127,6 +128,7 @@ using (var scope = app.Services.CreateScope())
     var services = scope.ServiceProvider;
     var db = services.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
+    await EnsureUserSchemaAsync(db, usePostgres);
     await DbInitializer.SeedAsync(db);
     await SeedRolesAndAdminAsync(services);
     // Известный аккаунт разработчика через переменные окружения (восстановление доступа)
@@ -146,28 +148,92 @@ static async Task SeedRolesAndAdminAsync(IServiceProvider services)
             await roleManager.CreateAsync(new IdentityRole(role));
     }
 
-    if (!await userManager.Users.AnyAsync())
+    const string defaultLogin = "K1ng152";
+    const string defaultPassword = "Text-700";
+
+    // Миграция старого аккаунта «admin» → новый логин (смена логина на уже
+    // развёрнутых базах, где admin уже создан). Выполняется однократно.
+    if (defaultLogin != "admin")
     {
-        var login = GenerateLogin();
-        var password = GeneratePassword();
-        var admin = new ApplicationUser { UserName = login, EmailConfirmed = true };
-        var result = await userManager.CreateAsync(admin, password);
+        var oldAdmin = await userManager.FindByNameAsync("admin");
+        var newAccount = await userManager.FindByNameAsync(defaultLogin);
+        if (oldAdmin != null && newAccount == null)
+        {
+            oldAdmin.UserName = defaultLogin;
+            oldAdmin.NormalizedUserName = defaultLogin.ToUpperInvariant();
+            if ((await userManager.UpdateAsync(oldAdmin)).Succeeded)
+            {
+                var tok = await userManager.GeneratePasswordResetTokenAsync(oldAdmin);
+                await userManager.ResetPasswordAsync(oldAdmin, tok, defaultPassword);
+                if (!await userManager.IsInRoleAsync(oldAdmin, "Developer"))
+                    await userManager.AddToRoleAsync(oldAdmin, "Developer");
+            }
+        }
+    }
+
+    // Гарантируем постоянный аккаунт разработчика с ФИКСИРОВАННЫМИ данными,
+    // чтобы не приходилось каждый запуск угадывать случайный логин/пароль.
+    // (Если заданы SEED_LOGIN/SEED_PASSWORD — создаётся/сбрасывается они, см. EnsureEnvAdminAsync.)
+    var admin = await userManager.FindByNameAsync(defaultLogin);
+    if (admin == null)
+    {
+        admin = new ApplicationUser
+        {
+            UserName = defaultLogin,
+            EmailConfirmed = true,
+            Status = "active",
+            FullName = "Администратор"
+        };
+        var result = await userManager.CreateAsync(admin, defaultPassword);
         if (result.Succeeded)
         {
             await userManager.AddToRoleAsync(admin, "Developer");
             Console.WriteLine("==================================================");
-            Console.WriteLine("  СОЗДАН АККАУНТ РАЗРАБОТЧИКА (первый запуск):");
-            Console.WriteLine($"  Логин:  {login}");
-            Console.WriteLine($"  Пароль: {password}");
-            Console.WriteLine("  Сохраните их! Потом создавайте остальных через интерфейс.");
+            Console.WriteLine("  АККАУНТ РАЗРАБОТЧИКА (по умолчанию):");
+            Console.WriteLine("  Логин:    K1ng152");
+            Console.WriteLine("  Пароль:   Text-700");
+            Console.WriteLine("  (можно переопределить через SEED_LOGIN/SEED_PASSWORD)");
             Console.WriteLine("==================================================");
         }
+    }
+    else if (!await userManager.IsInRoleAsync(admin, "Developer"))
+    {
+        await userManager.AddToRoleAsync(admin, "Developer");
     }
 }
 
 // Если заданы SEED_LOGIN и SEED_PASSWORD — гарантируем существование
 // разработчика с этими данными (создаём или сбрасываем пароль). Это позволяет
 // восстановить доступ на хостинге (Render и т.п.), где логи недоступны/эфемерны.
+static async Task EnsureUserSchemaAsync(AppDbContext db, bool usePostgres)
+{
+    // EnsureCreated не добавляет колонки в уже существующие таблицы,
+    // поэтому добавляем поля профиля явно (идемпотентно).
+    try
+    {
+        if (usePostgres)
+        {
+            await db.Database.ExecuteSqlRawAsync("ALTER TABLE \"AspNetUsers\" ADD COLUMN IF NOT EXISTS \"FullName\" text;");
+            await db.Database.ExecuteSqlRawAsync("ALTER TABLE \"AspNetUsers\" ADD COLUMN IF NOT EXISTS \"DateOfBirth\" text;");
+            await db.Database.ExecuteSqlRawAsync("ALTER TABLE \"AspNetUsers\" ADD COLUMN IF NOT EXISTS \"Status\" text;");
+            await db.Database.ExecuteSqlRawAsync("ALTER TABLE \"AspNetUsers\" ADD COLUMN IF NOT EXISTS \"About\" text;");
+        }
+        else
+        {
+            TryAddColumnSqlite(db, "FullName");
+            TryAddColumnSqlite(db, "DateOfBirth");
+            TryAddColumnSqlite(db, "Status");
+            TryAddColumnSqlite(db, "About");
+        }
+    }
+    catch { }
+}
+
+static void TryAddColumnSqlite(AppDbContext db, string column)
+{
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE AspNetUsers ADD COLUMN " + column + " text;"); } catch { }
+}
+
 static async Task EnsureEnvAdminAsync(IServiceProvider services)
 {
     var login = Environment.GetEnvironmentVariable("SEED_LOGIN");
@@ -196,16 +262,4 @@ static async Task EnsureEnvAdminAsync(IServiceProvider services)
     }
 }
 
-static string GenerateLogin()
-{
-    const string chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-    var rnd = new Random();
-    return new string(Enumerable.Repeat(chars, 5).Select(c => c[rnd.Next(c.Length)]).ToArray());
-}
 
-static string GeneratePassword()
-{
-    const string chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-    var rnd = new Random();
-    return new string(Enumerable.Repeat(chars, 10).Select(c => c[rnd.Next(c.Length)]).ToArray());
-}

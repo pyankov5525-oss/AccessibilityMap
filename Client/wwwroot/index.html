@@ -71,6 +71,7 @@
                         ],
                         suppressMapOpenBlock: true
                     });
+                    try { map.controls.remove('routeButton'); } catch (e) {}
 
                     var accessibilityButton = new ymaps.control.Button({
                         data: { title: 'Доступность' },
@@ -87,7 +88,15 @@
                     map.controls.add(accessibilityButton, { float: 'right', position: { top: 55, right: 10 } });
 
                     map.events.add('click', function (e) {
-                        if (accessibilityMode && dotNetRef) {
+                        if (!accessibilityMode || !dotNetRef) return;
+                        var target = e.get('target');
+                        if (target && target.geometry && target.properties && target.properties.get && target.properties.get('name')) {
+                            // Клик по организации Яндекса (магазин, аптека и т.п.)
+                            var coords = target.geometry.getCoordinates();
+                            var name = target.properties.get('name') || '';
+                            var addr = (target.properties.get('description') || target.properties.get('text') || '').toString();
+                            dotNetRef.invokeMethodAsync('OnPoiClick', coords[0], coords[1], name, addr).catch(function(){});
+                        } else {
                             var coords = e.get('coords');
                             dotNetRef.invokeMethodAsync('OnMapClickWithCoords', coords[0], coords[1]);
                         }
@@ -100,8 +109,9 @@
                             maxWidth: 250,
                             layout: ymaps.templateLayoutFactory.createClass(
                                 '<div style="display:flex; gap:4px; padding:4px; background:#fff; border-radius:4px; box-shadow:0 1px 3px rgba(0,0,0,0.2);">' +
-                                '<input id="customSearchInput" type="text" placeholder="Поиск адреса..." style="padding:4px 8px; border:1px solid #ccc; border-radius:3px; font-size:12px; width:180px;">' +
-                                '<button id="customSearchBtn" style="padding:4px 8px; background:#2196F3; color:#fff; border:none; border-radius:3px; cursor:pointer; font-size:12px;">🔍</button>' +
+                                '<input id="customSearchInput" type="text" placeholder="Поиск адреса..." style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:14px; width:260px;">' +
+                                '<button id="customSearchBtn" style="padding:6px 10px; background:#2196F3; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:14px;">🔍</button>' +
+                                '<div id="customSearchSuggest" style="display:none; position:absolute; z-index:1000; top:44px; left:0; background:#fff; border:1px solid #ccc; border-radius:4px; max-height:260px; overflow:auto; width:320px; box-shadow:0 2px 8px rgba(0,0,0,0.2);"></div>' +
                                 '</div>'
                             )
                         }
@@ -120,26 +130,40 @@
                             }
                         });
                         verifyButton.events.add('click', function () { toggleVerifyMode(); });
-                        map.controls.add(verifyButton, { float: 'right', position: { top: 95, right: 10 } });
+                        map.controls.add(verifyButton, { float: 'right', position: { top: 100, right: 10 } });
                     }
 
-                    setTimeout(function () {
-                        var btn = document.getElementById('customSearchBtn');
-                        var input = document.getElementById('customSearchInput');
-                        if (btn && input) {
-                            btn.onclick = function () {
-                                var query = input.value.trim();
-                                if (query && dotNetRef) {
-                                    dotNetRef.invokeMethodAsync('SearchAddress', query);
-                                }
-                            };
-                            input.onkeydown = function (e) {
-                                if (e.key === 'Enter') {
-                                    btn.click();
-                                }
-                            };
-                        }
-                    }, 500);
+                        setTimeout(function () {
+                            var btn = document.getElementById('customSearchBtn');
+                            var input = document.getElementById('customSearchInput');
+                            if (btn && input) {
+                                btn.onclick = function () {
+                                    var query = input.value.trim();
+                                    if (query && dotNetRef) {
+                                        dotNetRef.invokeMethodAsync('SearchAddress', query);
+                                    }
+                                    hideSuggestions();
+                                };
+                                input.onkeydown = function (e) {
+                                    if (e.key === 'Enter') {
+                                        btn.click();
+                                    }
+                                };
+                                var t;
+                                input.oninput = function () {
+                                    clearTimeout(t);
+                                    var q = input.value.trim();
+                                    t = setTimeout(function () {
+                                        if (q.length >= 3 && dotNetRef) {
+                                            dotNetRef.invokeMethodAsync('SearchSuggestions', q);
+                                        } else {
+                                            hideSuggestions();
+                                        }
+                                    }, 350);
+                                };
+                                input.onblur = function () { setTimeout(hideSuggestions, 200); };
+                            }
+                        }, 500);
                 }
                 showPlacemarks();
                 updateCounter();
@@ -207,8 +231,11 @@
             var list = placemarksData;
             if (verifyMode) {
                 list = list.filter(function (p) { return p.verificationStatus && p.verificationStatus !== 'approved'; });
-            } else if (currentFilter !== 'all') {
-                list = list.filter(function (p) { return p.level === currentFilter; });
+            } else {
+                list = list.filter(function (p) { return !p.verificationStatus || p.verificationStatus === 'approved'; });
+                if (currentFilter !== 'all') {
+                    list = list.filter(function (p) { return p.level === currentFilter; });
+                }
             }
             var total = list.length;
             var green = list.filter(function (p) { return p.level === 'green'; }).length;
@@ -226,10 +253,14 @@
             if (placemarksData.length > 0) {
                 var filtered = placemarksData;
                 if (verifyMode) {
-                    // режим проверки — только неодобренные (серые) метки
+                    // режим проверки — ТОЛЬКО неодобренные (серые) метки
                     filtered = placemarksData.filter(function (p) { return p.verificationStatus && p.verificationStatus !== 'approved'; });
-                } else if (currentFilter !== 'all') {
-                    filtered = placemarksData.filter(function (p) { return p.level === currentFilter; });
+                } else {
+                    // обычный режим — ТОЛЬКО одобренные; серые видны лишь в режиме проверки
+                    filtered = placemarksData.filter(function (p) { return !p.verificationStatus || p.verificationStatus === 'approved'; });
+                    if (currentFilter !== 'all') {
+                        filtered = filtered.filter(function (p) { return p.level === currentFilter; });
+                    }
                 }
                 filtered.forEach(function (p) {
                     var isPending = p.verificationStatus && p.verificationStatus !== 'approved';
@@ -319,44 +350,40 @@
             }
         }
 
+        function showSuggestions(items) {
+            var box = document.getElementById('customSearchSuggest');
+            if (!box) return;
+            if (!items || !items.length) { box.style.display = 'none'; return; }
+            box.innerHTML = '';
+            items.forEach(function (it) {
+                var div = document.createElement('div');
+                div.style.padding = '8px 10px';
+                div.style.cursor = 'pointer';
+                div.style.borderBottom = '1px solid #eee';
+                div.style.fontSize = '13px';
+                div.textContent = it.address || '';
+                div.onmouseenter = function () { div.style.background = '#f0f6ff'; };
+                div.onmouseleave = function () { div.style.background = '#fff'; };
+                div.onmousedown = function (e) {
+                    e.preventDefault();
+                    if (dotNetRef) dotNetRef.invokeMethodAsync('OnGeocodeResult', it.lat, it.lon, it.address || '').catch(function(){});
+                    hideSuggestions();
+                };
+                box.appendChild(div);
+            });
+            box.style.display = 'block';
+        }
+
+        function hideSuggestions() {
+            var box = document.getElementById('customSearchSuggest');
+            if (box) box.style.display = 'none';
+        }
+
         function destroyMap() {
             try { if (map) { map.destroy(); } } catch (e) {}
             map = null;
         }
 
-        // Клиентский геокодинг через Яндекс.Карты (там валидный JS-ключ)
-        function geocodeAddressJs(query) {
-            if (!window.ymaps || !ymaps.geocode) {
-                if (dotNetRef) dotNetRef.invokeMethodAsync('OnGeocodeResult', 0, 0, '');
-                return;
-            }
-            ymaps.geocode(query, { results: 1 }).then(function (res) {
-                var go = res.geoObjects.get(0);
-                if (!go) {
-                    if (dotNetRef) dotNetRef.invokeMethodAsync('OnGeocodeResult', 0, 0, '').catch(function(){});
-                    return;
-                }
-                var coords = go.geometry.getCoordinates();
-                var text = go.getAddressLine ? go.getAddressLine() : go.properties.get('text');
-                if (dotNetRef) dotNetRef.invokeMethodAsync('OnGeocodeResult', coords[0], coords[1], text || '').catch(function(){});
-            }).catch(function () {
-                if (dotNetRef) dotNetRef.invokeMethodAsync('OnGeocodeResult', 0, 0, '').catch(function(){});
-            });
-        }
-
-        function reverseGeocodeJs(lat, lon) {
-            if (!window.ymaps || !ymaps.geocode) {
-                if (dotNetRef) dotNetRef.invokeMethodAsync('OnReverseGeocodeResult', '');
-                return;
-            }
-            ymaps.geocode([lat, lon], { results: 1, kind: 'house' }).then(function (res) {
-                var go = res.geoObjects.get(0);
-                var text = go ? (go.getAddressLine ? go.getAddressLine() : go.properties.get('text')) : '';
-                if (dotNetRef) dotNetRef.invokeMethodAsync('OnReverseGeocodeResult', text || '').catch(function(){});
-            }).catch(function () {
-                if (dotNetRef) dotNetRef.invokeMethodAsync('OnReverseGeocodeResult', '');
-            });
-        }
     </script>
 </body>
 

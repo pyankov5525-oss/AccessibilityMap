@@ -13,6 +13,10 @@
             <label class="form-label">Пароль:</label>
             <input type="password" @bind="password" class="form-control" />
         </div>
+        <div class="field">
+            <label class="form-label">Проверка (капча): <b>@captchaQuestion</b></label>
+            <input @bind="captchaAnswer" class="form-control" placeholder="Введите ответ" />
+        </div>
         <button class="btn btn-primary" @onclick="DoLogin">Войти</button>
         @if (!string.IsNullOrEmpty(error))
         {
@@ -24,14 +28,38 @@
 @code {
     private string login = "";
     private string password = "";
+    private string captchaToken = "";
+    private string captchaQuestion = "";
+    private string captchaAnswer = "";
     private string error = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCaptcha();
+    }
+
+    private async Task LoadCaptcha()
+    {
+        try
+        {
+            var c = await Http.GetFromJsonAsync<CaptchaResult>("/api/auth/captcha");
+            if (c != null)
+            {
+                captchaToken = c.token;
+                captchaQuestion = c.question;
+                captchaAnswer = "";
+            }
+        }
+        catch { }
+    }
 
     private async Task DoLogin()
     {
         error = "";
         try
         {
-            var response = await Http.PostAsJsonAsync("/api/auth/login", new { Login = login, Password = password });
+            var response = await Http.PostAsJsonAsync("/api/auth/login",
+                new { Login = login, Password = password, CaptchaToken = captchaToken, CaptchaAnswer = captchaAnswer });
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<LoginResult>();
@@ -42,7 +70,16 @@
             }
             else
             {
-                error = "Неверный логин или пароль";
+                try
+                {
+                    var err = await response.Content.ReadFromJsonAsync<ErrorResult>();
+                    error = err?.error ?? "Неверный логин или пароль";
+                }
+                catch
+                {
+                    error = "Неверный логин или пароль";
+                }
+                await LoadCaptcha(); // при ошибке — новая капча
             }
         }
         catch (Exception ex)
@@ -56,5 +93,16 @@
         public string Token { get; set; } = "";
         public string UserName { get; set; } = "";
         public string Role { get; set; } = "";
+    }
+
+    public class ErrorResult
+    {
+        public string? error { get; set; }
+    }
+
+    public class CaptchaResult
+    {
+        public string token { get; set; } = "";
+        public string question { get; set; } = "";
     }
 }

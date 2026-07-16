@@ -31,6 +31,7 @@ public class PlacemarksController : ControllerBase
     }
 
     [HttpGet]
+    [AllowAnonymous]
     public async Task<IActionResult> GetAll()
     {
         var placemarks = await _db.Placemarks.ToListAsync();
@@ -38,6 +39,7 @@ public class PlacemarksController : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [AllowAnonymous]
     public async Task<IActionResult> GetById(int id)
     {
         var p = await _db.Placemarks.FindAsync(id);
@@ -46,6 +48,7 @@ public class PlacemarksController : ControllerBase
     }
 
     [HttpGet("nearest")]
+    [AllowAnonymous]
     public async Task<IActionResult> GetNearest([FromQuery] string lat, [FromQuery] string lon)
     {
         if (!double.TryParse(lat, Invariant, out double latitude) ||
@@ -102,6 +105,9 @@ public class PlacemarksController : ControllerBase
         }
 
         placemark.CreatedAt = DateTime.UtcNow;
+        // Обязательная модерация: новые метки появляются на публичной карте
+        // только после одобрения управляющим/разработчиком (verificationStatus=approved).
+        placemark.VerificationStatus = "pending";
         // Неодобренные метки живут в БД ~сутки, затем авто-удаляются фоновой службой.
         placemark.ExpiresAt = DateTime.UtcNow.AddHours(24);
         _db.Placemarks.Add(placemark);
@@ -154,6 +160,7 @@ public class PlacemarksController : ControllerBase
     }
 
     [HttpGet("geocode")]
+    [AllowAnonymous]
     public async Task<IActionResult> Geocode([FromQuery] string address)
     {
         if (string.IsNullOrWhiteSpace(address))
@@ -165,8 +172,32 @@ public class PlacemarksController : ControllerBase
         {
             var url = $"https://geocode-maps.yandex.ru/1.x/?apikey={GeocoderApiKey}&geocode={Uri.EscapeDataString(address)}&format=json";
             var client = _httpClientFactory.CreateClient();
-            var response = await client.GetStringAsync(url);
-            return Content(response, "application/json");
+            var json = await client.GetStringAsync(url);
+
+            // Возвращаем готовую структуру, чтобы клиенту не пришлось парсить
+            // «сырой» ответ Яндекса. pos имеет вид "долгота широта".
+            var doc = System.Text.Json.JsonDocument.Parse(json);
+            var members = doc.RootElement
+                .GetProperty("response")
+                .GetProperty("GeoObjectCollection")
+                .GetProperty("featureMember");
+
+            if (members.GetArrayLength() > 0)
+            {
+                var go = members[0].GetProperty("GeoObject");
+                var pos = go.GetProperty("Point").GetProperty("pos").GetString() ?? "";
+                var text = go.GetProperty("metaDataProperty")
+                               .GetProperty("GeocoderMetaData")
+                               .GetProperty("text").GetString() ?? "";
+                var parts = pos.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length == 2 &&
+                    double.TryParse(parts[0], Invariant, out double lon) &&
+                    double.TryParse(parts[1], Invariant, out double lat))
+                {
+                    return Ok(new { lat, lon, address = text });
+                }
+            }
+            return Ok(new { lat = 0.0, lon = 0.0, address = "" });
         }
         catch (Exception ex)
         {
@@ -208,7 +239,48 @@ public class PlacemarksController : ControllerBase
         return Ok();
     }
 
+    // Подсказки при поиске (несколько вариантов адреса, как в поиске Яндекса)
+    [HttpGet("suggest")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Suggest([FromQuery] string q, [FromQuery] int limit = 5)
+    {
+        if (string.IsNullOrWhiteSpace(q))
+            return Ok(new { items = new List<object>() });
+        try
+        {
+            var url = $"https://geocode-maps.yandex.ru/1.x/?apikey={GeocoderApiKey}&geocode={Uri.EscapeDataString(q)}&format=json&results={limit}";
+            var client = _httpClientFactory.CreateClient();
+            var json = await client.GetStringAsync(url);
+            var doc = System.Text.Json.JsonDocument.Parse(json);
+            var members = doc.RootElement
+                .GetProperty("response")
+                .GetProperty("GeoObjectCollection")
+                .GetProperty("featureMember");
+            var items = new List<object>();
+            foreach (var m in members.EnumerateArray())
+            {
+                var go = m.GetProperty("GeoObject");
+                var pos = go.GetProperty("Point").GetProperty("pos").GetString() ?? "";
+                var text = go.GetProperty("metaDataProperty").GetProperty("GeocoderMetaData").GetProperty("text").GetString() ?? "";
+                var parts = pos.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length == 2 &&
+                    double.TryParse(parts[0], Invariant, out double lon) &&
+                    double.TryParse(parts[1], Invariant, out double lat))
+                {
+                    items.Add(new { lat, lon, address = text });
+                }
+            }
+            return Ok(new { items });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Suggest failed for {Q}", q);
+            return Ok(new { items = new List<object>() });
+        }
+    }
+
     [HttpGet("reverse-geocode")]
+    [AllowAnonymous]
     public async Task<IActionResult> ReverseGeocode([FromQuery] double lat, [FromQuery] double lon)
     {
         try

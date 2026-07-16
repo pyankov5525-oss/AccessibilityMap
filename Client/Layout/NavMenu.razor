@@ -6,8 +6,12 @@
     <a class="brand" href="">♿ Карта доступности</a>
     <nav class="nav-links">
         <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Карта</NavLink>
-        <NavLink class="nav-link" href="places">Список</NavLink>
-        @if (Auth.Role == "Manager" || Auth.Role == "Developer")
+    <NavLink class="nav-link" href="places">Список</NavLink>
+    @if (Auth.IsAuthenticated)
+    {
+        <NavLink class="nav-link" href="profile">Профиль</NavLink>
+    }
+    @if (Auth.Role == "Manager" || Auth.Role == "Developer")
         {
             <NavLink class="nav-link" href="verify">Проверка</NavLink>
             <NavLink class="nav-link" href="users">Пользователи</NavLink>

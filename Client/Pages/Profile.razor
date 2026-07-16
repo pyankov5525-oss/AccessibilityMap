@@ -1,0 +1,213 @@
+@page "/profile"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject AccessibilityMap.Services.AuthState Auth
+
+<h3>Профиль</h3>
+
+@if (!Auth.IsAuthenticated)
+{
+    <p class="muted">Войдите в систему, чтобы увидеть профиль.</p>
+}
+else if (loading)
+{
+    <p>Загрузка...</p>
+}
+else if (profile == null)
+{
+    <p class="muted">Профиль не найден или нет доступа.</p>
+}
+else
+{
+    <div class="form-card" style="max-width:520px;">
+        <div class="field">
+            <label class="form-label">Логин</label>
+            <input class="form-control" value="@profile.UserName" disabled />
+        </div>
+        <div class="field">
+            <label class="form-label">Роль</label>
+            <input class="form-control" value="@RoleRu(profile.Role)" disabled />
+        </div>
+        <div class="field">
+            <label class="form-label">Статус</label>
+            @if (canEditStatus)
+            {
+                <select @bind="editStatus" class="form-control">
+                    <option value="active">Активен</option>
+                    <option value="blocked">Заблокирован</option>
+                </select>
+            }
+            else
+            {
+                <input class="form-control" value="@StatusRu(profile.Status)" disabled />
+            }
+        </div>
+        <div class="field">
+            <label class="form-label">ФИО</label>
+            <input @bind="editFullName" class="form-control" placeholder="Иванов Иван Иванович" />
+        </div>
+        <div class="field">
+            <label class="form-label">Дата рождения</label>
+            <input type="date" @bind="editDob" class="form-control" />
+        </div>
+        <div class="field">
+            <label class="form-label">О себе</label>
+            <textarea @bind="editAbout" class="form-control" rows="3"></textarea>
+        </div>
+        <button class="btn btn-success" @onclick="Save">Сохранить</button>
+
+        <hr />
+        <h5>Смена пароля</h5>
+        <div class="field">
+            <label class="form-label">Текущий пароль</label>
+            <input type="password" @bind="curPwd" class="form-control" />
+        </div>
+        <div class="field">
+            <label class="form-label">Новый пароль</label>
+            <input type="password" @bind="newPwd" class="form-control" />
+        </div>
+        <div class="field">
+            <label class="form-label">Повторите новый пароль</label>
+            <input type="password" @bind="newPwd2" class="form-control" />
+        </div>
+        <button class="btn btn-warning" @onclick="ChangePassword">Сменить пароль</button>
+
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <div class="alert @(isError ? "alert-danger" : "alert-success")" style="margin-top:10px;">@message</div>
+        }
+    </div>
+}
+
+@code {
+    private ProfileData? profile;
+    private bool loading = true;
+    private string message = "";
+    private bool isError = false;
+
+    private string editFullName = "";
+    private DateTime? editDob;
+    private string editAbout = "";
+    private string editStatus = "active";
+
+    private string curPwd = "";
+    private string newPwd = "";
+    private string newPwd2 = "";
+
+    private string? viewId;
+
+    private bool canEditStatus => Auth.Role == "Developer" || Auth.Role == "Manager";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsAuthenticated) { loading = false; return; }
+        var query = new Uri(Navigation.Uri).Query;
+        var m = System.Text.RegularExpressions.Regex.Match(query, @"[?&]id=([^&]+)");
+        if (m.Success) viewId = m.Groups[1].Value;
+        await Load();
+        loading = false;
+    }
+
+    private async Task Load()
+    {
+        try
+        {
+            var url = string.IsNullOrEmpty(viewId) ? "/api/auth/profile" : $"/api/auth/profile?id={viewId}";
+            var resp = await Http.GetAsync(url);
+            if (resp.IsSuccessStatusCode)
+            {
+                profile = await resp.Content.ReadFromJsonAsync<ProfileData>();
+                editFullName = profile?.FullName ?? "";
+                editDob = DateTime.TryParse(profile?.DateOfBirth, out var d) ? d : null;
+                editAbout = profile?.About ?? "";
+                editStatus = profile?.Status ?? "active";
+            }
+            else if (resp.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                message = "Нет доступа к этому профилю.";
+                isError = true;
+            }
+            else if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                Navigation.NavigateTo("");
+            }
+        }
+        catch (Exception ex)
+        {
+            message = "Ошибка загрузки профиля: " + ex.Message;
+            isError = true;
+        }
+    }
+
+    private async Task Save()
+    {
+        var model = new { FullName = editFullName, DateOfBirth = editDob?.ToString("yyyy-MM-dd"), About = editAbout, Status = editStatus };
+        HttpResponseMessage resp;
+        if (!string.IsNullOrEmpty(viewId) && canEditStatus)
+            resp = await Http.PutAsJsonAsync($"/api/auth/{viewId}/profile", model);
+        else
+            resp = await Http.PutAsJsonAsync("/api/auth/profile", model);
+
+        if (resp.IsSuccessStatusCode)
+        {
+            message = "Сохранено ✅";
+            isError = false;
+            await Load();
+        }
+        else
+        {
+            message = "Не удалось сохранить.";
+            isError = true;
+        }
+    }
+
+    private async Task ChangePassword()
+    {
+        message = "";
+        if (newPwd != newPwd2) { message = "Новые пароли не совпадают."; isError = true; return; }
+        if (string.IsNullOrEmpty(newPwd) || newPwd.Length < 6) { message = "Новый пароль должен быть не короче 6 символов."; isError = true; return; }
+        var resp = await Http.PostAsJsonAsync("/api/auth/change-password", new { CurrentPassword = curPwd, NewPassword = newPwd });
+        if (resp.IsSuccessStatusCode)
+        {
+            message = "Пароль изменён ✅";
+            isError = false;
+            curPwd = ""; newPwd = ""; newPwd2 = "";
+        }
+        else
+        {
+            var err = await resp.Content.ReadFromJsonAsync<ErrorResult>();
+            message = "Не удалось сменить пароль: " + (err?.Error ?? "");
+            isError = true;
+        }
+    }
+
+    private string RoleRu(string r) => r switch
+    {
+        "Developer" => "Разработчик",
+        "Manager" => "Управляющий",
+        "Volunteer" => "Волонтёр",
+        _ => r
+    };
+
+    private string StatusRu(string? s) => s switch
+    {
+        "blocked" => "Заблокирован",
+        _ => "Активен"
+    };
+
+    public class ProfileData
+    {
+        public string Id { get; set; } = "";
+        public string UserName { get; set; } = "";
+        public string? FullName { get; set; }
+        public string? DateOfBirth { get; set; }
+        public string? Status { get; set; }
+        public string? About { get; set; }
+        public string Role { get; set; } = "";
+    }
+
+    public class ErrorResult
+    {
+        public string? Error { get; set; }
+    }
+}

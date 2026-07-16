@@ -16,3 +16,6 @@ Server/uploads/
 # Rider / VS
 .idea/
 .vs/
+Server/accessibility.db*
+bin/
+obj/

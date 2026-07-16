@@ -1,4 +1,5 @@
 using AccessibilityMap.Server.Data;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -42,7 +43,7 @@ public class PlacemarkCleanupService : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "PlacemarkCleanupService: ошибка очистки");
+                _logger.LogWarning("PlacemarkCleanupService: ошибка очистки: {Msg}", ex.Message);
             }
 
             await Task.Delay(TimeSpan.FromMinutes(10), stoppingToken);
