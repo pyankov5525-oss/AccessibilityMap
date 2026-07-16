@@ -45,6 +45,55 @@
             dotNetRef = ref;
         }
 
+        var searchSuggestTimer = null;
+        var searchHandlersReady = false;
+
+        function ensureSearchHandlers() {
+            if (searchHandlersReady) return;
+            searchHandlersReady = true;
+
+            document.addEventListener('click', function (e) {
+                if (e.target && e.target.id === 'customSearchBtn') {
+                    var input = document.getElementById('customSearchInput');
+                    var query = input ? input.value.trim() : '';
+                    if (query && dotNetRef) {
+                        dotNetRef.invokeMethodAsync('SearchAddress', query).catch(function(){});
+                    }
+                    hideSuggestions();
+                }
+            });
+
+            document.addEventListener('keydown', function (e) {
+                if (e.target && e.target.id === 'customSearchInput' && e.key === 'Enter') {
+                    e.preventDefault();
+                    var query = e.target.value.trim();
+                    if (query && dotNetRef) {
+                        dotNetRef.invokeMethodAsync('SearchAddress', query).catch(function(){});
+                    }
+                    hideSuggestions();
+                }
+            });
+
+            document.addEventListener('input', function (e) {
+                if (!e.target || e.target.id !== 'customSearchInput') return;
+                clearTimeout(searchSuggestTimer);
+                var q = e.target.value.trim();
+                searchSuggestTimer = setTimeout(function () {
+                    if (q.length >= 3 && dotNetRef) {
+                        dotNetRef.invokeMethodAsync('SearchSuggestions', q).catch(function(){});
+                    } else {
+                        hideSuggestions();
+                    }
+                }, 250);
+            });
+
+            document.addEventListener('focusout', function (e) {
+                if (e.target && e.target.id === 'customSearchInput') {
+                    setTimeout(hideSuggestions, 200);
+                }
+            });
+        }
+
         function setFilter(filter) {
             currentFilter = filter;
             showPlacemarks();
@@ -124,37 +173,7 @@
                     });
                     map.controls.add(searchButton, { float: 'left', position: { top: 10, left: 10 } });
 
-                        setTimeout(function () {
-                            var btn = document.getElementById('customSearchBtn');
-                            var input = document.getElementById('customSearchInput');
-                            if (btn && input) {
-                                btn.onclick = function () {
-                                    var query = input.value.trim();
-                                    if (query && dotNetRef) {
-                                        dotNetRef.invokeMethodAsync('SearchAddress', query);
-                                    }
-                                    hideSuggestions();
-                                };
-                                input.onkeydown = function (e) {
-                                    if (e.key === 'Enter') {
-                                        btn.click();
-                                    }
-                                };
-                                var t;
-                                input.oninput = function () {
-                                    clearTimeout(t);
-                                    var q = input.value.trim();
-                                    t = setTimeout(function () {
-                                        if (q.length >= 3 && dotNetRef) {
-                                            dotNetRef.invokeMethodAsync('SearchSuggestions', q);
-                                        } else {
-                                            hideSuggestions();
-                                        }
-                                    }, 350);
-                                };
-                                input.onblur = function () { setTimeout(hideSuggestions, 200); };
-                            }
-                        }, 500);
+                        ensureSearchHandlers();
                 }
                 showPlacemarks();
                 updateCounter();

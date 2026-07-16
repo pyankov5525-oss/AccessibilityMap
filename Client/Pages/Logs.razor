@@ -2,9 +2,10 @@
 @inject HttpClient Http
 @inject AccessibilityMap.Services.AuthState Auth
 
-<h3>Журнал действий (разработчик)</h3>
+<h3>Журнал действий всех пользователей</h3>
 
 <div class="subtabs">
+    <button class="subtab @(tab == "all" ? "subtab-active" : "")" @onclick="@(() => SetTab("all"))">Все</button>
     <button class="subtab @(tab == "login" ? "subtab-active" : "")" @onclick="@(() => SetTab("login"))">Входы</button>
     <button class="subtab @(tab == "placemark" ? "subtab-active" : "")" @onclick="@(() => SetTab("placemark"))">Постановка меток</button>
     <button class="subtab @(tab == "action" ? "subtab-active" : "")" @onclick="@(() => SetTab("action"))">Действия</button>
@@ -42,7 +43,7 @@ else
 
 @code {
     private List<LogRow> logs = new();
-    private string tab = "login";
+    private string tab = "all";
     private bool loading = true;
 
     protected override async Task OnInitializedAsync() => await Load();
@@ -51,7 +52,8 @@ else
     {
         try
         {
-            var resp = await Http.GetAsync("/api/logs?type=" + tab);
+            var url = tab == "all" ? "/api/logs" : "/api/logs?type=" + tab;
+            var resp = await Http.GetAsync(url);
             if (resp.IsSuccessStatusCode)
             {
                 logs = await resp.Content.ReadFromJsonAsync<List<LogRow>>() ?? new List<LogRow>();

@@ -47,12 +47,12 @@
 
                 <div class="field">
                     <label class="form-label">Адрес:</label>
-                    <input @bind="newPlacemark.Address" class="form-control" placeholder="ул. Ленина, 10, Воронеж" />
+                    <input @bind="newPlacemark.Address" @bind:event="oninput" class="form-control" placeholder="ул. Ленина, 10, Воронеж" />
                 </div>
 
                 <div class="field">
                     <label class="form-label">Название:</label>
-                    <input @bind="newPlacemark.Name" class="form-control" />
+                    <input @bind="newPlacemark.Name" @bind:event="oninput" class="form-control" />
                 </div>
 
                 <div class="field">
@@ -91,7 +91,7 @@
 
                 <div class="field">
                     <label class="form-label">Примечания:</label>
-                    <textarea @bind="newPlacemark.Notes" class="form-control" rows="2"></textarea>
+                    <textarea @bind="newPlacemark.Notes" @bind:event="oninput" class="form-control" rows="2"></textarea>
                 </div>
 
                 <div class="form-actions">

@@ -7,15 +7,15 @@
         <p class="muted">Войдите в систему</p>
         <div class="field">
             <label class="form-label">Логин:</label>
-            <input @bind="login" class="form-control" />
+            <input @bind="login" @bind:event="oninput" class="form-control" />
         </div>
         <div class="field">
             <label class="form-label">Пароль:</label>
-            <input type="password" @bind="password" class="form-control" />
+            <input type="password" @bind="password" @bind:event="oninput" class="form-control" />
         </div>
         <div class="field">
             <label class="form-label">Проверка (капча): <b>@captchaQuestion</b></label>
-            <input @bind="captchaAnswer" class="form-control" placeholder="Введите ответ" />
+            <input @bind="captchaAnswer" @bind:event="oninput" class="form-control" placeholder="Введите ответ" />
         </div>
         <button class="btn btn-primary" @onclick="DoLogin">Войти</button>
         @if (!string.IsNullOrEmpty(error))

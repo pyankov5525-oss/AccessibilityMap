@@ -20,7 +20,7 @@
             <button class="chip chip-red @(filter == "red" ? "chip-active" : "")" @onclick="@(() => SetFilter("red"))">🔴 Недоступно</button>
         </div>
         <input class="form-control search-box" placeholder="Поиск по названию или адресу..."
-               @bind="search" @oninput="OnSearchInput" />
+               value="@search" @oninput="OnSearchInput" />
     </div>
 
     @if (loading)

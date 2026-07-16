@@ -44,7 +44,7 @@ else
         </div>
         <div class="field">
             <label class="form-label">ФИО</label>
-            <input @bind="editFullName" class="form-control" placeholder="Иванов Иван Иванович" />
+            <input @bind="editFullName" @bind:event="oninput" class="form-control" placeholder="Иванов Иван Иванович" />
         </div>
         <div class="field">
             <label class="form-label">Дата рождения</label>
@@ -52,7 +52,7 @@ else
         </div>
         <div class="field">
             <label class="form-label">О себе</label>
-            <textarea @bind="editAbout" class="form-control" rows="3"></textarea>
+            <textarea @bind="editAbout" @bind:event="oninput" class="form-control" rows="3"></textarea>
         </div>
         <button class="btn btn-success" @onclick="Save">Сохранить</button>
 
@@ -60,15 +60,15 @@ else
         <h5>Смена пароля</h5>
         <div class="field">
             <label class="form-label">Текущий пароль</label>
-            <input type="password" @bind="curPwd" class="form-control" />
+            <input type="password" @bind="curPwd" @bind:event="oninput" class="form-control" />
         </div>
         <div class="field">
             <label class="form-label">Новый пароль</label>
-            <input type="password" @bind="newPwd" class="form-control" />
+            <input type="password" @bind="newPwd" @bind:event="oninput" class="form-control" />
         </div>
         <div class="field">
             <label class="form-label">Повторите новый пароль</label>
-            <input type="password" @bind="newPwd2" class="form-control" />
+            <input type="password" @bind="newPwd2" @bind:event="oninput" class="form-control" />
         </div>
         <button class="btn btn-warning" @onclick="ChangePassword">Сменить пароль</button>
 
