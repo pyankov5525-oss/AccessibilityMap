@@ -476,3 +476,32 @@ textarea.form-control:disabled {
   position: absolute;
   right: 12px;
 }
+
+/* Окно создания пользователя */
+.user-actions-panel {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 12px 0 16px;
+}
+.modal-backdrop-custom {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0,0,0,.62);
+}
+.modal-card-custom {
+  width: 520px;
+  max-width: 96vw;
+  max-height: 90vh;
+  overflow: auto;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 18px 60px rgba(0,0,0,.45);
+}

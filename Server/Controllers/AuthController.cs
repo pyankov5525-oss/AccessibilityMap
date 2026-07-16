@@ -44,7 +44,9 @@ public class AuthController : ControllerBase
 
     public class CreateModel
     {
-        public string Role { get; set; } = "";
+        public string Role { get; set; } = "Volunteer";
+        public string FullName { get; set; } = "";
+        public string DateOfBirth { get; set; } = "";
     }
 
     [HttpPost("login")]
@@ -110,29 +112,39 @@ public class AuthController : ControllerBase
     [Authorize]
     public IActionResult Logout() => Ok(new { ok = true });
 
-    // Разработчик создаёт управляющего (роль Developer оставляем единственной — K1ng152)
+    // Авто-создание аккаунта со случайным логином/паролем.
+    // Developer выбирает Manager/Volunteer; Manager может создать только Volunteer.
     [HttpPost("create")]
     [Authorize(Roles = "Developer")]
     public async Task<IActionResult> CreateManagerOrDev([FromBody] CreateModel model)
     {
-        if (model.Role != "Manager")
-            return BadRequest(new { error = "Можно создавать только управляющих. Роль разработчика зарезервирована за основным аккаунтом." });
-        return await CreateUser(model.Role);
+        if (model.Role != "Manager" && model.Role != "Volunteer")
+            return BadRequest(new { error = "Можно создать только управляющего или волонтёра. Роль разработчика зарезервирована за основным аккаунтом." });
+        return await CreateUser(model.Role, model.FullName, model.DateOfBirth);
     }
 
-    // Управляющий создаёт волонтёра
     [HttpPost("create-volunteer")]
     [Authorize(Roles = "Manager,Developer")]
-    public async Task<IActionResult> CreateVolunteer()
+    public async Task<IActionResult> CreateVolunteer([FromBody] CreateModel model)
     {
-        return await CreateUser("Volunteer");
+        return await CreateUser("Volunteer", model.FullName, model.DateOfBirth);
     }
 
-    private async Task<IActionResult> CreateUser(string role)
+    private async Task<IActionResult> CreateUser(string role, string fullName, string dateOfBirth)
     {
+        var validation = ValidateProfileRequired(fullName, dateOfBirth);
+        if (validation != null) return validation;
+
         var login = GenerateLogin();
         var password = GeneratePassword();
-        var user = new ApplicationUser { UserName = login, EmailConfirmed = true, Status = "active" };
+        var user = new ApplicationUser
+        {
+            UserName = login,
+            EmailConfirmed = true,
+            Status = "active",
+            FullName = fullName.Trim(),
+            DateOfBirth = dateOfBirth.Trim()
+        };
         var result = await _userManager.CreateAsync(user, password);
         if (!result.Succeeded)
             return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
@@ -149,7 +161,7 @@ public class AuthController : ControllerBase
             await _db.SaveChangesAsync();
         }
         catch { }
-        return Ok(new { login, password, role });
+        return Ok(new { login, password, role, fullName = user.FullName, dateOfBirth = user.DateOfBirth });
     }
 
     // Список пользователей. Developer видит всех, Manager — только волонтёров.
@@ -167,7 +179,7 @@ public class AuthController : ControllerBase
                 var role = roles.FirstOrDefault() ?? "";
                 if (currentRole == "Manager" && role != "Volunteer")
                     continue;
-                result.Add(new { id = u.Id, userName = u.UserName, role });
+                result.Add(new { id = u.Id, userName = u.UserName, role, fullName = u.FullName, dateOfBirth = u.DateOfBirth, status = u.Status });
             }
             return Ok(result);
         }
@@ -330,6 +342,36 @@ public class AuthController : ControllerBase
         public string? Status { get; set; }
     }
 
+
+    [HttpGet("db-status")]
+    [Authorize(Roles = "Developer")]
+    public IActionResult DbStatus()
+    {
+        var provider = _db.Database.ProviderName ?? "unknown";
+        var databaseUrlSet = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DATABASE_URL"));
+        var isPersistent = provider.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) || provider.Contains("PostgreSQL", StringComparison.OrdinalIgnoreCase);
+        return Ok(new
+        {
+            provider,
+            databaseUrlSet,
+            isPersistent,
+            storage = isPersistent ? "PostgreSQL/Supabase — постоянная база" : "SQLite — временная база Render, данные могут пропадать после деплоя"
+        });
+    }
+
+    private BadRequestObjectResult? ValidateProfileRequired(string fullName, string dateOfBirth)
+    {
+        if (string.IsNullOrWhiteSpace(fullName))
+            return BadRequest(new { error = "Укажите ФИО пользователя" });
+        if (string.IsNullOrWhiteSpace(dateOfBirth))
+            return BadRequest(new { error = "Укажите дату рождения пользователя" });
+        if (!DateTime.TryParse(dateOfBirth, out var dob))
+            return BadRequest(new { error = "Дата рождения указана неверно" });
+        if (dob.Year < 1900 || dob.Date > DateTime.UtcNow.Date)
+            return BadRequest(new { error = "Проверьте год рождения" });
+        return null;
+    }
+
     // ===== Капча (защита входа от ботов) =====
     private static readonly ConcurrentDictionary<string, (string Answer, DateTime Expiry)> _captchas = new();
 
@@ -354,6 +396,8 @@ public class AuthController : ControllerBase
             return BadRequest(new { error = "Укажите логин и пароль" });
         if (model.Password.Length < 6)
             return BadRequest(new { error = "Пароль должен быть не короче 6 символов" });
+        var validation = ValidateProfileRequired(model.FullName, model.DateOfBirth);
+        if (validation != null) return validation;
 
         var self = await _userManager.GetUserAsync(User);
         var selfRoles = self == null ? new List<string>() : await _userManager.GetRolesAsync(self);
@@ -371,7 +415,14 @@ public class AuthController : ControllerBase
         if (await _userManager.FindByNameAsync(model.Login) != null)
             return BadRequest(new { error = "Такой логин уже занят" });
 
-        var user = new ApplicationUser { UserName = model.Login, EmailConfirmed = true, Status = "active" };
+        var user = new ApplicationUser
+        {
+            UserName = model.Login.Trim(),
+            EmailConfirmed = true,
+            Status = "active",
+            FullName = model.FullName.Trim(),
+            DateOfBirth = model.DateOfBirth.Trim()
+        };
         var result = await _userManager.CreateAsync(user, model.Password);
         if (!result.Succeeded)
             return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
@@ -387,7 +438,7 @@ public class AuthController : ControllerBase
             await _db.SaveChangesAsync();
         }
         catch { }
-        return Ok(new { login = model.Login, role = model.Role });
+        return Ok(new { login = model.Login, password = model.Password, role = model.Role, fullName = user.FullName, dateOfBirth = user.DateOfBirth });
     }
 
     // ===== Смена пароля самому пользователю =====
@@ -429,6 +480,8 @@ public class AuthController : ControllerBase
         public string Login { get; set; } = "";
         public string Password { get; set; } = "";
         public string Role { get; set; } = "Volunteer";
+        public string FullName { get; set; } = "";
+        public string DateOfBirth { get; set; } = "";
     }
 
     public class ChangePasswordModel

@@ -6,40 +6,19 @@
 <h3>Управление пользователями</h3>
 <p>Вы вошли как: <b>@RoleRu(Auth.Role)</b></p>
 
-@if (Auth.Role == "Developer")
+@if (dbStatus != null && Auth.Role == "Developer")
 {
-    <div class="form-card" style="max-width:440px;">
-        <h5>Создать управляющего (авто-логин/пароль)</h5>
-        <input value="Управляющий" class="form-control" disabled />
-        <button class="btn btn-primary" @onclick="CreateManagerOrDev">Создать</button>
-
-        <h5 style="margin-top:16px;">Создать вручную (свой логин/пароль)</h5>
-        <div class="field"><input @bind="mLogin" class="form-control" placeholder="Логин" /></div>
-        <div class="field"><input type="password" @bind="mPassword" class="form-control" placeholder="Пароль (более 6 символов)" /></div>
-        <div class="field">
-            <select @bind="mRole" class="form-control">
-                <option value="Manager">Управляющий</option>
-                <option value="Volunteer">Волонтёр</option>
-            </select>
-        </div>
-        <button class="btn btn-secondary" @onclick="RegisterManual">Создать вручную</button>
+    <div class="alert @(dbStatus.IsPersistent ? "alert-success" : "alert-danger")" style="max-width:760px;">
+        <b>База данных:</b> @dbStatus.Storage<br />
+        <span>Провайдер: @dbStatus.Provider; DATABASE_URL: @(dbStatus.DatabaseUrlSet ? "задан" : "не задан")</span>
     </div>
 }
-else if (Auth.Role == "Manager")
-{
-    <div class="form-card" style="max-width:440px;">
-        <h5>Создать волонтёра (авто-логин/пароль)</h5>
-        <button class="btn btn-primary" @onclick="CreateVolunteer">Создать волонтёра</button>
 
-        <h5 style="margin-top:16px;">Создать вручную</h5>
-        <div class="field"><input @bind="mLogin" class="form-control" placeholder="Логин" /></div>
-        <div class="field"><input type="password" @bind="mPassword" class="form-control" placeholder="Пароль (более 6 символов)" /></div>
-        <div class="field">
-            <select @bind="mRole" class="form-control">
-                <option value="Volunteer">Волонтёр</option>
-            </select>
-        </div>
-        <button class="btn btn-secondary" @onclick="RegisterManual">Создать вручную</button>
+@if (Auth.Role == "Developer" || Auth.Role == "Manager")
+{
+    <div class="user-actions-panel">
+        <button class="btn btn-primary" @onclick="OpenManualCreate">Создать профиль</button>
+        <button class="btn btn-secondary" @onclick="OpenAutoCreate">Сгенерировать логин/пароль</button>
     </div>
 }
 else
@@ -49,63 +28,124 @@ else
 
 @if (created != null)
 {
-    <div class="alert alert-success" style="max-width:440px; margin-top:12px;">
+    <div class="alert alert-success" style="max-width:520px; margin-top:12px;">
         Создан аккаунт:<br />
         Логин: <b>@created.Login</b><br />
-        Пароль: <b>@created.Password</b><br />
-        Роль: @created.Role
+        @if (!string.IsNullOrWhiteSpace(created.Password))
+        {
+            <span>Пароль: <b>@created.Password</b></span><br />
+        }
+        Роль: @RoleRu(created.Role)<br />
+        ФИО: @created.FullName<br />
+        Дата рождения: @created.DateOfBirth
     </div>
 }
 
 @if (!string.IsNullOrEmpty(message))
 {
-    <div class="alert alert-warning" style="max-width:440px; margin-top:12px;">@message</div>
+    <div class="alert alert-warning" style="max-width:520px; margin-top:12px;">@message</div>
+}
+
+@if (showCreateWindow)
+{
+    <div class="modal-backdrop-custom">
+        <div class="modal-card-custom">
+            <div class="detail-head">
+                <h4>@(createMode == "manual" ? "Создать профиль вручную" : "Сгенерировать логин и пароль")</h4>
+                <button class="btn btn-sm btn-secondary" @onclick="CloseCreateWindow">Закрыть</button>
+            </div>
+
+            <p class="muted">
+                ФИО и дата рождения обязательны. Без них аккаунт не будет создан.
+            </p>
+
+            <div class="field">
+                <label class="form-label">Роль</label>
+                <select @bind="createRole" class="form-control">
+                    @foreach (var role in AllowedCreateRoles)
+                    {
+                        <option value="@role">@RoleRu(role)</option>
+                    }
+                </select>
+            </div>
+
+            <div class="field">
+                <label class="form-label">ФИО</label>
+                <input @bind="createFullName" @bind:event="oninput" class="form-control" placeholder="Иванов Иван Иванович" />
+            </div>
+
+            <div class="field">
+                <label class="form-label">Дата рождения</label>
+                <input type="date" @bind="createDateOfBirth" class="form-control" />
+            </div>
+
+            @if (createMode == "manual")
+            {
+                <div class="field">
+                    <label class="form-label">Логин</label>
+                    <input @bind="manualLogin" @bind:event="oninput" class="form-control" placeholder="login" />
+                </div>
+                <div class="field">
+                    <label class="form-label">Пароль</label>
+                    <input type="password" @bind="manualPassword" @bind:event="oninput" class="form-control" placeholder="Минимум 6 символов" />
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-warning">
+                    Логин и пароль будут сгенерированы автоматически после нажатия кнопки.
+                </div>
+            }
+
+            <div class="form-actions">
+                <button class="btn btn-success" @onclick="CreateAccount">
+                    @(createMode == "manual" ? "Создать профиль" : "Сгенерировать и создать")
+                </button>
+                <button class="btn btn-secondary" @onclick="CloseCreateWindow">Отмена</button>
+            </div>
+        </div>
+    </div>
 }
 
 @if (loading)
 {
     <p>Загрузка пользователей...</p>
 }
-else
+else if (Auth.Role == "Developer" || Auth.Role == "Manager")
 {
     <div class="page">
-        @if (Auth.Role == "Developer")
-        {
-        <h5>Разработчики</h5>
-        <table class="places-table">
-            <thead><tr><th>Логин</th><th>Роль</th><th></th><th></th></tr></thead>
-            <tbody>
-            @foreach (var u in users.Where(x => x.Role == "Developer").ToList())
+        <div class="subtabs">
+            <button class="subtab @(activeTab == "all" ? "subtab-active" : "")" @onclick="@(() => SetTab("all"))">Все (@VisibleUsers.Count)</button>
+            @if (Auth.Role == "Developer")
             {
-                bool isSelf = u.UserName == Auth.UserName;
-                <tr>
-                    <td>@(u.UserName + (isSelf ? " (вы)" : ""))</td>
-                    <td>@RoleRu(u.Role)</td>
-                    <td class="row-actions">
-                        <button class="btn btn-sm btn-info" @onclick="() => ViewProfile(u.Id)">Профиль</button>
-                    </td>
-                    <td class="row-actions">
-                        <button class="btn btn-sm btn-danger" disabled @onclick="() => DeleteUser(u.Id)">Удалить</button>
-                    </td>
-                </tr>
+                <button class="subtab @(activeTab == "Developer" ? "subtab-active" : "")" @onclick="@(() => SetTab("Developer"))">Разработчики (@CountRole("Developer"))</button>
+                <button class="subtab @(activeTab == "Manager" ? "subtab-active" : "")" @onclick="@(() => SetTab("Manager"))">Управляющие (@CountRole("Manager"))</button>
             }
-            </tbody>
-        </table>
-        }
+            <button class="subtab @(activeTab == "Volunteer" ? "subtab-active" : "")" @onclick="@(() => SetTab("Volunteer"))">Волонтёры (@CountRole("Volunteer"))</button>
+        </div>
 
-        @if (Auth.Role == "Developer")
-        {
-        <h5>Управляющие</h5>
         <table class="places-table">
-            <thead><tr><th>Логин</th><th>Роль</th><th></th><th></th></tr></thead>
+            <thead>
+                <tr>
+                    <th>Логин</th>
+                    <th>ФИО</th>
+                    <th>Дата рождения</th>
+                    <th>Роль</th>
+                    <th>Статус</th>
+                    <th></th>
+                    <th></th>
+                </tr>
+            </thead>
             <tbody>
-            @foreach (var u in users.Where(x => x.Role == "Manager").ToList())
+            @foreach (var u in FilteredUsers)
             {
                 bool isSelf = u.UserName == Auth.UserName;
                 <tr>
                     <td>@(u.UserName + (isSelf ? " (вы)" : ""))</td>
+                    <td>@(string.IsNullOrWhiteSpace(u.FullName) ? "—" : u.FullName)</td>
+                    <td>@(string.IsNullOrWhiteSpace(u.DateOfBirth) ? "—" : u.DateOfBirth)</td>
                     <td>
-                        @if (Auth.Role == "Developer")
+                        @if (CanChangeRole(u))
                         {
                             <select class="form-control form-control-sm" @onchange="e => ChangeRoleSafe(u.Id, e.Value)">
                                 @foreach (var r in new[] { "Manager", "Volunteer" })
@@ -126,76 +166,68 @@ else
                             @RoleRu(u.Role)
                         }
                     </td>
+                    <td>@StatusRu(u.Status)</td>
                     <td class="row-actions">
                         <button class="btn btn-sm btn-info" @onclick="() => ViewProfile(u.Id)">Профиль</button>
                     </td>
                     <td class="row-actions">
-                        <button class="btn btn-sm btn-danger" disabled="@isSelf" @onclick="() => DeleteUser(u.Id)">Удалить</button>
+                        <button class="btn btn-sm btn-danger" disabled="@(isSelf || u.Role == "Developer")" @onclick="() => DeleteUser(u.Id)">Удалить</button>
                     </td>
                 </tr>
             }
             </tbody>
         </table>
-        }
 
-        <h5>Волонтёры</h5>
-        <table class="places-table">
-            <thead><tr><th>Логин</th><th>Роль</th><th></th><th></th></tr></thead>
-            <tbody>
-            @foreach (var u in users.Where(x => x.Role == "Volunteer").ToList())
-            {
-                bool isSelf = u.UserName == Auth.UserName;
-                <tr>
-                    <td>@(u.UserName + (isSelf ? " (вы)" : ""))</td>
-                    <td>
-                        @if (Auth.Role == "Developer")
-                        {
-                            <select class="form-control form-control-sm" @onchange="e => ChangeRoleSafe(u.Id, e.Value)">
-                                @foreach (var r in new[] { "Manager", "Volunteer" })
-                                {
-                                    @if (r == u.Role)
-                                    {
-                                        <option value="@r" selected>@RoleRu(r)</option>
-                                    }
-                                    else
-                                    {
-                                        <option value="@r">@RoleRu(r)</option>
-                                    }
-                                }
-                            </select>
-                        }
-                        else
-                        {
-                            @RoleRu(u.Role)
-                        }
-                    </td>
-                    <td class="row-actions">
-                        <button class="btn btn-sm btn-info" @onclick="() => ViewProfile(u.Id)">Профиль</button>
-                    </td>
-                    <td class="row-actions">
-                        <button class="btn btn-sm btn-danger" disabled="@isSelf" @onclick="() => DeleteUser(u.Id)">Удалить</button>
-                    </td>
-                </tr>
-            }
-            </tbody>
-        </table>
+        @if (FilteredUsers.Count == 0)
+        {
+            <p class="muted">В этой вкладке пользователей нет.</p>
+        }
     </div>
 }
 
 @code {
-    private string newRole = "Manager";
-    private string mLogin = "";
-    private string mPassword = "";
-    private string mRole = "Volunteer";
     private CreatedUser? created;
     private List<UserRow> users = new();
     private bool loading = true;
     private string message = "";
+    private string activeTab = "all";
+    private DbStatus? dbStatus;
+
+    private bool showCreateWindow = false;
+    private string createMode = "manual";
+    private string createRole = "Volunteer";
+    private string createFullName = "";
+    private DateTime? createDateOfBirth;
+    private string manualLogin = "";
+    private string manualPassword = "";
+
+    private IEnumerable<string> AllowedCreateRoles => Auth.Role == "Developer"
+        ? new[] { "Manager", "Volunteer" }
+        : new[] { "Volunteer" };
+
+    private List<UserRow> VisibleUsers => Auth.Role == "Manager"
+        ? users.Where(u => u.Role == "Volunteer").ToList()
+        : users;
+
+    private List<UserRow> FilteredUsers => activeTab == "all"
+        ? VisibleUsers
+        : VisibleUsers.Where(u => u.Role == activeTab).ToList();
 
     protected override async Task OnInitializedAsync()
     {
         await LoadUsers();
+        if (Auth.Role == "Developer")
+            await LoadDbStatus();
         loading = false;
+    }
+
+    private async Task LoadDbStatus()
+    {
+        try
+        {
+            dbStatus = await Http.GetFromJsonAsync<DbStatus>("/api/auth/db-status");
+        }
+        catch { dbStatus = null; }
     }
 
     private async Task LoadUsers()
@@ -204,18 +236,94 @@ else
         {
             var resp = await Http.GetAsync("/api/auth/users");
             if (resp.IsSuccessStatusCode)
-            {
                 users = await resp.Content.ReadFromJsonAsync<List<UserRow>>() ?? new List<UserRow>();
-            }
             else
-            {
                 users = new List<UserRow>();
-            }
         }
         catch
         {
             users = new List<UserRow>();
         }
+    }
+
+    private void SetTab(string tab) => activeTab = tab;
+
+    private int CountRole(string role) => VisibleUsers.Count(x => x.Role == role);
+
+    private void OpenManualCreate()
+    {
+        createMode = "manual";
+        OpenCreateWindow();
+    }
+
+    private void OpenAutoCreate()
+    {
+        createMode = "auto";
+        OpenCreateWindow();
+    }
+
+    private void OpenCreateWindow()
+    {
+        message = "";
+        created = null;
+        createRole = AllowedCreateRoles.First();
+        createFullName = "";
+        createDateOfBirth = null;
+        manualLogin = "";
+        manualPassword = "";
+        showCreateWindow = true;
+    }
+
+    private void CloseCreateWindow() => showCreateWindow = false;
+
+    private async Task CreateAccount()
+    {
+        message = "";
+        if (string.IsNullOrWhiteSpace(createFullName)) { message = "Укажите ФИО"; return; }
+        if (createDateOfBirth == null) { message = "Укажите дату рождения"; return; }
+        if (!AllowedCreateRoles.Contains(createRole)) { message = "Недоступная роль"; return; }
+
+        var dob = createDateOfBirth.Value.ToString("yyyy-MM-dd");
+        HttpResponseMessage res;
+        if (createMode == "manual")
+        {
+            if (string.IsNullOrWhiteSpace(manualLogin) || string.IsNullOrWhiteSpace(manualPassword))
+            {
+                message = "Укажите логин и пароль";
+                return;
+            }
+            res = await Http.PostAsJsonAsync("/api/auth/register", new
+            {
+                Login = manualLogin,
+                Password = manualPassword,
+                Role = createRole,
+                FullName = createFullName,
+                DateOfBirth = dob
+            });
+        }
+        else
+        {
+            var url = Auth.Role == "Developer" ? "/api/auth/create" : "/api/auth/create-volunteer";
+            res = await Http.PostAsJsonAsync(url, new
+            {
+                Role = createRole,
+                FullName = createFullName,
+                DateOfBirth = dob
+            });
+        }
+
+        if (res.IsSuccessStatusCode)
+        {
+            created = await res.Content.ReadFromJsonAsync<CreatedUser>();
+            showCreateWindow = false;
+            await LoadUsers();
+            await LoadDbStatus();
+        }
+        else
+        {
+            message = await ReadError(res);
+        }
+        StateHasChanged();
     }
 
     private async Task ChangeRoleSafe(string id, object? value)
@@ -228,15 +336,7 @@ else
     private async Task ChangeRole(string id, string role)
     {
         var resp = await Http.PostAsJsonAsync($"/api/auth/{id}/role", new { Role = role });
-        if (!resp.IsSuccessStatusCode)
-        {
-            var err = await resp.Content.ReadFromJsonAsync<ErrorResult>();
-            message = err?.Error ?? "Не удалось сменить роль";
-        }
-        else
-        {
-            message = "";
-        }
+        message = resp.IsSuccessStatusCode ? "" : await ReadError(resp);
         await LoadUsers();
         StateHasChanged();
     }
@@ -244,70 +344,25 @@ else
     private async Task DeleteUser(string id)
     {
         var resp = await Http.DeleteAsync($"/api/auth/{id}");
-        if (!resp.IsSuccessStatusCode)
-        {
-            var err = await resp.Content.ReadFromJsonAsync<ErrorResult>();
-            message = err?.Error ?? "Не удалось удалить";
-        }
-        else
-        {
-            message = "";
-        }
+        message = resp.IsSuccessStatusCode ? "" : await ReadError(resp);
         await LoadUsers();
         StateHasChanged();
     }
+
+    private bool CanChangeRole(UserRow u) => Auth.Role == "Developer" && u.Role != "Developer" && u.UserName != Auth.UserName;
 
     private void ViewProfile(string id) => Nav.NavigateTo($"/profile?id={id}");
 
-    private async Task CreateManagerOrDev()
+    private async Task<string> ReadError(HttpResponseMessage resp)
     {
-        newRole = "Manager";
-        var res = await Http.PostAsJsonAsync("/api/auth/create", new { Role = newRole });
-        if (res.IsSuccessStatusCode)
+        try
         {
-            created = await res.Content.ReadFromJsonAsync<CreatedUser>();
-            message = "";
-            await LoadUsers();
+            var err = await resp.Content.ReadFromJsonAsync<ErrorResult>();
+            if (!string.IsNullOrWhiteSpace(err?.Error)) return err.Error;
+            if (err?.Errors?.Length > 0) return string.Join("; ", err.Errors);
         }
-        else
-        {
-            var err = await res.Content.ReadFromJsonAsync<ErrorResult>();
-            message = err?.Error ?? "Не удалось создать управляющего";
-        }
-    }
-
-    private async Task RegisterManual()
-    {
-        if (string.IsNullOrWhiteSpace(mLogin) || string.IsNullOrWhiteSpace(mPassword)) { message = "Укажите логин и пароль"; return; }
-        var res = await Http.PostAsJsonAsync("/api/auth/register", new { Login = mLogin, Password = mPassword, Role = mRole });
-        if (res.IsSuccessStatusCode)
-        {
-            created = new CreatedUser { Login = mLogin, Password = mPassword, Role = mRole };
-            mLogin = ""; mPassword = "";
-        }
-        else
-        {
-            var err = await res.Content.ReadFromJsonAsync<ErrorResult>();
-            message = err?.Error ?? "Не удалось создать пользователя";
-        }
-        await LoadUsers();
-        StateHasChanged();
-    }
-
-    private async Task CreateVolunteer()
-    {
-        var res = await Http.PostAsJsonAsync("/api/auth/create-volunteer", new { });
-        if (res.IsSuccessStatusCode)
-        {
-            created = await res.Content.ReadFromJsonAsync<CreatedUser>();
-            message = "";
-            await LoadUsers();
-        }
-        else
-        {
-            var err = await res.Content.ReadFromJsonAsync<ErrorResult>();
-            message = err?.Error ?? "Не удалось создать волонтёра";
-        }
+        catch { }
+        return "Операция не выполнена";
     }
 
     private string RoleRu(string r) => r switch
@@ -318,11 +373,20 @@ else
         _ => r
     };
 
+    private string StatusRu(string? s) => s switch
+    {
+        "blocked" => "Заблокирован",
+        _ => "Активен"
+    };
+
     public class UserRow
     {
         public string Id { get; set; } = "";
         public string UserName { get; set; } = "";
         public string Role { get; set; } = "";
+        public string? FullName { get; set; }
+        public string? DateOfBirth { get; set; }
+        public string? Status { get; set; }
     }
 
     public class CreatedUser
@@ -330,10 +394,21 @@ else
         public string Login { get; set; } = "";
         public string Password { get; set; } = "";
         public string Role { get; set; } = "";
+        public string? FullName { get; set; }
+        public string? DateOfBirth { get; set; }
     }
 
     public class ErrorResult
     {
-        public string Error { get; set; } = "";
+        public string? Error { get; set; }
+        public string[]? Errors { get; set; }
+    }
+
+    public class DbStatus
+    {
+        public string Provider { get; set; } = "";
+        public bool DatabaseUrlSet { get; set; }
+        public bool IsPersistent { get; set; }
+        public string Storage { get; set; } = "";
     }
 }
