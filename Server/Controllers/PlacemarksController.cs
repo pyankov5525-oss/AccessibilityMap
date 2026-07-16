@@ -34,7 +34,14 @@ public class PlacemarksController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> GetAll()
     {
-        var placemarks = await _db.Placemarks.ToListAsync();
+        // Публичным (анонимным) пользователям отдаём только одобренные метки
+        // (обязательная модерация — новые видны на карте лишь после апрува).
+        // Авторизованным (управляющий/разработчик в режиме проверки) — все,
+        // чтобы можно было одобрить/вернуть.
+        IQueryable<PlacemarkModel> query = _db.Placemarks;
+        if (!User.Identity!.IsAuthenticated)
+            query = query.Where(p => p.VerificationStatus == "approved");
+        var placemarks = await query.ToListAsync();
         return Ok(placemarks.Select(ToDto).ToList());
     }
 
