@@ -110,13 +110,13 @@ public class AuthController : ControllerBase
     [Authorize]
     public IActionResult Logout() => Ok(new { ok = true });
 
-    // Разработчик создаёт управляющего или разработчика
+    // Разработчик создаёт управляющего (роль Developer оставляем единственной — K1ng152)
     [HttpPost("create")]
     [Authorize(Roles = "Developer")]
     public async Task<IActionResult> CreateManagerOrDev([FromBody] CreateModel model)
     {
-        if (model.Role != "Manager" && model.Role != "Developer")
-            return BadRequest(new { error = "Можно создавать только Manager или Developer" });
+        if (model.Role != "Manager")
+            return BadRequest(new { error = "Можно создавать только управляющих. Роль разработчика зарезервирована за основным аккаунтом." });
         return await CreateUser(model.Role);
     }
 
@@ -132,7 +132,7 @@ public class AuthController : ControllerBase
     {
         var login = GenerateLogin();
         var password = GeneratePassword();
-        var user = new ApplicationUser { UserName = login, EmailConfirmed = true };
+        var user = new ApplicationUser { UserName = login, EmailConfirmed = true, Status = "active" };
         var result = await _userManager.CreateAsync(user, password);
         if (!result.Succeeded)
             return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
@@ -152,18 +152,22 @@ public class AuthController : ControllerBase
         return Ok(new { login, password, role });
     }
 
-    // Список всех пользователей с их ролью (Manager/Developer)
+    // Список пользователей. Developer видит всех, Manager — только волонтёров.
     [HttpGet("users")]
     [Authorize(Roles = "Manager,Developer")]
     public async Task<IActionResult> ListUsers()
     {
         try
         {
+            var currentRole = await GetCurrentRoleAsync();
             var result = new List<object>();
             foreach (var u in _db.Users.ToList())
             {
                 var roles = await _userManager.GetRolesAsync(u);
-                result.Add(new { id = u.Id, userName = u.UserName, role = roles.FirstOrDefault() ?? "" });
+                var role = roles.FirstOrDefault() ?? "";
+                if (currentRole == "Manager" && role != "Volunteer")
+                    continue;
+                result.Add(new { id = u.Id, userName = u.UserName, role });
             }
             return Ok(result);
         }
@@ -178,13 +182,16 @@ public class AuthController : ControllerBase
     [Authorize(Roles = "Developer")]
     public async Task<IActionResult> ChangeRole(string id, [FromBody] RoleModel model)
     {
-        if (model.Role != "Developer" && model.Role != "Manager" && model.Role != "Volunteer")
-            return BadRequest(new { error = "Недопустимая роль" });
+        if (model.Role != "Manager" && model.Role != "Volunteer")
+            return BadRequest(new { error = "Недопустимая роль. Роль разработчика нельзя назначать через интерфейс." });
 
         var user = await _userManager.FindByIdAsync(id);
         if (user == null) return NotFound();
 
         var current = await _userManager.GetRolesAsync(user);
+        if (current.Contains("Developer"))
+            return BadRequest(new { error = "Нельзя менять роль разработчика." });
+
         foreach (var r in current)
             await _userManager.RemoveFromRoleAsync(user, r);
         await _userManager.AddToRoleAsync(user, model.Role);
@@ -217,11 +224,11 @@ public class AuthController : ControllerBase
 
         var roles = await _userManager.GetRolesAsync(user);
         if (roles.Contains("Developer"))
-        {
-            var devs = await _userManager.GetUsersInRoleAsync("Developer");
-            if (devs.Count <= 1)
-                return BadRequest(new { error = "Нельзя удалить последнего разработчика" });
-        }
+            return BadRequest(new { error = "Нельзя удалить разработчика" });
+
+        var currentRole = await GetCurrentRoleAsync();
+        if (currentRole == "Manager" && !roles.Contains("Volunteer"))
+            return Forbid();
 
         await _userManager.DeleteAsync(user);
         try
@@ -258,7 +265,7 @@ public class AuthController : ControllerBase
         return Ok(new ProfileDto
         {
             Id = target.Id,
-            UserName = target.UserName,
+            UserName = target.UserName ?? string.Empty,
             FullName = target.FullName,
             DateOfBirth = target.DateOfBirth,
             Status = target.Status,
@@ -288,6 +295,7 @@ public class AuthController : ControllerBase
     {
         var user = await _userManager.FindByIdAsync(id);
         if (user == null) return NotFound();
+        if (!await CanCurrentUserManageTargetAsync(user)) return Forbid();
         user.FullName = model.FullName;
         user.DateOfBirth = model.DateOfBirth;
         user.About = model.About;
@@ -351,12 +359,14 @@ public class AuthController : ControllerBase
         var selfRoles = self == null ? new List<string>() : await _userManager.GetRolesAsync(self);
         bool allowed;
         if (selfRoles.Contains("Developer"))
-            allowed = true; // разработчик создаёт любую роль
-        else if (selfRoles.Contains("Manager") && (model.Role == "Volunteer" || model.Role == "Manager"))
-            allowed = true; // управляющий — только волонтёра/управляющего
+            allowed = model.Role == "Manager" || model.Role == "Volunteer"; // разработчик создаёт управляющих и волонтёров
+        else if (selfRoles.Contains("Manager"))
+            allowed = model.Role == "Volunteer"; // управляющий — только волонтёра
         else
             allowed = false;
         if (!allowed) return Forbid();
+        if (model.Role == "Developer")
+            return BadRequest(new { error = "Роль разработчика зарезервирована за основным аккаунтом." });
 
         if (await _userManager.FindByNameAsync(model.Login) != null)
             return BadRequest(new { error = "Такой логин уже занят" });
@@ -406,6 +416,7 @@ public class AuthController : ControllerBase
     {
         var user = await _userManager.FindByIdAsync(id);
         if (user == null) return NotFound();
+        if (!await CanCurrentUserManageTargetAsync(user)) return Forbid();
         var token = await _userManager.GeneratePasswordResetTokenAsync(user);
         var result = await _userManager.ResetPasswordAsync(user, token, model.NewPassword);
         if (!result.Succeeded)
@@ -429,6 +440,26 @@ public class AuthController : ControllerBase
     public class ResetPasswordModel
     {
         public string NewPassword { get; set; } = "";
+    }
+
+
+    private async Task<string> GetCurrentRoleAsync()
+    {
+        var current = await _userManager.GetUserAsync(User);
+        if (current == null) return string.Empty;
+        var roles = await _userManager.GetRolesAsync(current);
+        return roles.FirstOrDefault() ?? string.Empty;
+    }
+
+    private async Task<bool> CanCurrentUserManageTargetAsync(ApplicationUser target)
+    {
+        var currentRole = await GetCurrentRoleAsync();
+        var targetRoles = await _userManager.GetRolesAsync(target);
+        if (currentRole == "Developer")
+            return !targetRoles.Contains("Developer");
+        if (currentRole == "Manager")
+            return targetRoles.Contains("Volunteer");
+        return false;
     }
 
     private string GenerateToken(ApplicationUser user, IList<string> roles)

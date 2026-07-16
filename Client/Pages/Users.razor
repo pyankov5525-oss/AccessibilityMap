@@ -9,13 +9,8 @@
 @if (Auth.Role == "Developer")
 {
     <div class="form-card" style="max-width:440px;">
-        <h5>Создать управляющего или разработчика (авто-логин/пароль)</h5>
-        <div class="field">
-            <select @bind="newRole" class="form-control">
-                <option value="Manager">Управляющий</option>
-                <option value="Developer">Разработчик</option>
-            </select>
-        </div>
+        <h5>Создать управляющего (авто-логин/пароль)</h5>
+        <input value="Управляющий" class="form-control" disabled />
         <button class="btn btn-primary" @onclick="CreateManagerOrDev">Создать</button>
 
         <h5 style="margin-top:16px;">Создать вручную (свой логин/пароль)</h5>
@@ -23,7 +18,6 @@
         <div class="field"><input type="password" @bind="mPassword" class="form-control" placeholder="Пароль (более 6 символов)" /></div>
         <div class="field">
             <select @bind="mRole" class="form-control">
-                <option value="Developer">Разработчик</option>
                 <option value="Manager">Управляющий</option>
                 <option value="Volunteer">Волонтёр</option>
             </select>
@@ -43,7 +37,6 @@ else if (Auth.Role == "Manager")
         <div class="field">
             <select @bind="mRole" class="form-control">
                 <option value="Volunteer">Волонтёр</option>
-                <option value="Manager">Управляющий</option>
             </select>
         </div>
         <button class="btn btn-secondary" @onclick="RegisterManual">Создать вручную</button>
@@ -76,6 +69,8 @@ else
 else
 {
     <div class="page">
+        @if (Auth.Role == "Developer")
+        {
         <h5>Разработчики</h5>
         <table class="places-table">
             <thead><tr><th>Логин</th><th>Роль</th><th></th><th></th></tr></thead>
@@ -85,39 +80,21 @@ else
                 bool isSelf = u.UserName == Auth.UserName;
                 <tr>
                     <td>@(u.UserName + (isSelf ? " (вы)" : ""))</td>
-                    <td>
-                        @if (Auth.Role == "Developer")
-                        {
-                            <select class="form-control form-control-sm" @onchange="e => ChangeRoleSafe(u.Id, e.Value)">
-                                @foreach (var r in new[] { "Developer", "Manager", "Volunteer" })
-                                {
-                                    @if (r == u.Role)
-                                    {
-                                        <option value="@r" selected>@RoleRu(r)</option>
-                                    }
-                                    else
-                                    {
-                                        <option value="@r">@RoleRu(r)</option>
-                                    }
-                                }
-                            </select>
-                        }
-                        else
-                        {
-                            @RoleRu(u.Role)
-                        }
-                    </td>
+                    <td>@RoleRu(u.Role)</td>
                     <td class="row-actions">
                         <button class="btn btn-sm btn-info" @onclick="() => ViewProfile(u.Id)">Профиль</button>
                     </td>
                     <td class="row-actions">
-                        <button class="btn btn-sm btn-danger" disabled="@isSelf" @onclick="() => DeleteUser(u.Id)">Удалить</button>
+                        <button class="btn btn-sm btn-danger" disabled @onclick="() => DeleteUser(u.Id)">Удалить</button>
                     </td>
                 </tr>
             }
             </tbody>
         </table>
+        }
 
+        @if (Auth.Role == "Developer")
+        {
         <h5>Управляющие</h5>
         <table class="places-table">
             <thead><tr><th>Логин</th><th>Роль</th><th></th><th></th></tr></thead>
@@ -131,7 +108,7 @@ else
                         @if (Auth.Role == "Developer")
                         {
                             <select class="form-control form-control-sm" @onchange="e => ChangeRoleSafe(u.Id, e.Value)">
-                                @foreach (var r in new[] { "Developer", "Manager", "Volunteer" })
+                                @foreach (var r in new[] { "Manager", "Volunteer" })
                                 {
                                     @if (r == u.Role)
                                     {
@@ -159,6 +136,7 @@ else
             }
             </tbody>
         </table>
+        }
 
         <h5>Волонтёры</h5>
         <table class="places-table">
@@ -173,7 +151,7 @@ else
                         @if (Auth.Role == "Developer")
                         {
                             <select class="form-control form-control-sm" @onchange="e => ChangeRoleSafe(u.Id, e.Value)">
-                                @foreach (var r in new[] { "Developer", "Manager", "Volunteer" })
+                                @foreach (var r in new[] { "Manager", "Volunteer" })
                                 {
                                     @if (r == u.Role)
                                     {
@@ -283,8 +261,19 @@ else
 
     private async Task CreateManagerOrDev()
     {
+        newRole = "Manager";
         var res = await Http.PostAsJsonAsync("/api/auth/create", new { Role = newRole });
-        if (res.IsSuccessStatusCode) created = await res.Content.ReadFromJsonAsync<CreatedUser>();
+        if (res.IsSuccessStatusCode)
+        {
+            created = await res.Content.ReadFromJsonAsync<CreatedUser>();
+            message = "";
+            await LoadUsers();
+        }
+        else
+        {
+            var err = await res.Content.ReadFromJsonAsync<ErrorResult>();
+            message = err?.Error ?? "Не удалось создать управляющего";
+        }
     }
 
     private async Task RegisterManual()
@@ -308,7 +297,17 @@ else
     private async Task CreateVolunteer()
     {
         var res = await Http.PostAsJsonAsync("/api/auth/create-volunteer", new { });
-        if (res.IsSuccessStatusCode) created = await res.Content.ReadFromJsonAsync<CreatedUser>();
+        if (res.IsSuccessStatusCode)
+        {
+            created = await res.Content.ReadFromJsonAsync<CreatedUser>();
+            message = "";
+            await LoadUsers();
+        }
+        else
+        {
+            var err = await res.Content.ReadFromJsonAsync<ErrorResult>();
+            message = err?.Error ?? "Не удалось создать волонтёра";
+        }
     }
 
     private string RoleRu(string r) => r switch

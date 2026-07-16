@@ -259,7 +259,26 @@ static async Task EnsureUserSchemaAsync(AppDbContext db, bool usePostgres)
 
 static void TryAddColumnSqlite(AppDbContext db, string column)
 {
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE AspNetUsers ADD COLUMN " + column + " text;"); } catch { }
+    try
+    {
+        var connection = db.Database.GetDbConnection();
+        if (connection.State != System.Data.ConnectionState.Open)
+            connection.Open();
+
+        using (var check = connection.CreateCommand())
+        {
+            check.CommandText = "PRAGMA table_info(AspNetUsers);";
+            using var reader = check.ExecuteReader();
+            while (reader.Read())
+            {
+                if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase))
+                    return;
+            }
+        }
+
+        db.Database.ExecuteSqlRaw("ALTER TABLE AspNetUsers ADD COLUMN " + column + " text;");
+    }
+    catch { }
 }
 
 static async Task EnsureEnvAdminAsync(IServiceProvider services)

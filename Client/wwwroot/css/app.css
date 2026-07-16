@@ -443,3 +443,16 @@ h1, h2, h3, h4, h5, h6 { margin: 0 0 8px; font-weight: 600; }
   flex-wrap: wrap;
   margin-top: 10px;
 }
+
+/* Disabled/readonly поля тоже в тёмной теме (логин/роль в профиле и т.п.) */
+.form-control:disabled,
+.form-control[readonly],
+input.form-control:disabled,
+select.form-control:disabled,
+textarea.form-control:disabled {
+  background: var(--bg-input) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+  opacity: 1 !important;
+  -webkit-text-fill-color: var(--text) !important;
+}

@@ -137,7 +137,8 @@ else
                 items = new List<PlacemarkData>();
                 return;
             }
-            items = await resp.Content.ReadFromJsonAsync<List<PlacemarkData>>() ?? new List<PlacemarkData>();
+            var all = await resp.Content.ReadFromJsonAsync<List<PlacemarkData>>() ?? new List<PlacemarkData>();
+            items = all.Where(x => x.VerificationStatus == "pending").ToList();
         }
         catch (Exception ex)
         {
@@ -179,7 +180,12 @@ else
 
     private async Task SetStatus(int id, string status)
     {
-        await Http.PostAsJsonAsync($"/api/placemarks/{id}/verify", new { Status = status });
+        var resp = await Http.PostAsJsonAsync($"/api/placemarks/{id}/verify", new { Status = status });
+        if (resp.IsSuccessStatusCode)
+        {
+            items.RemoveAll(x => x.Id == id);
+            holds.RemoveAll(x => x.Id == id);
+        }
         selected = null;
         await LoadReview();
         await LoadHolds();

@@ -2,6 +2,7 @@
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
+@inject AccessibilityMap.Services.AuthState Auth
 
 <PageTitle>Список объектов</PageTitle>
 
@@ -53,8 +54,11 @@
                         <td>@p.TotalScore / 21</td>
                         <td><span class="level-badge level-@p.Level">@p.LevelText</span></td>
                         <td class="row-actions">
-                            <button class="btn btn-sm btn-secondary" @onclick="@(() => Edit(p.Id))">Изменить</button>
-                            <button class="btn btn-sm btn-danger" @onclick="@(() => Delete(p.Id))">Удалить</button>
+                            @if (CanManagePlacemarks)
+                            {
+                                <button class="btn btn-sm btn-secondary" @onclick="@(() => Edit(p.Id))">Изменить</button>
+                                <button class="btn btn-sm btn-danger" @onclick="@(() => Delete(p.Id))">Удалить</button>
+                            }
                         </td>
                     </tr>
                 }
@@ -80,6 +84,7 @@
     private string filter = "all";
     private string search = "";
     private bool loading = true;
+    private bool CanManagePlacemarks => Auth.Role == "Manager" || Auth.Role == "Developer";
 
     protected override async Task OnInitializedAsync()
     {

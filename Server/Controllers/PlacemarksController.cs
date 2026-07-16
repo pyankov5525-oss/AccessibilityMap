@@ -34,12 +34,12 @@ public class PlacemarksController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> GetAll()
     {
-        // Публичным (анонимным) пользователям отдаём только одобренные метки
-        // (обязательная модерация — новые видны на карте лишь после апрува).
-        // Авторизованным (управляющий/разработчик в режиме проверки) — все,
-        // чтобы можно было одобрить/вернуть.
+        // Публичным пользователям и волонтёрам отдаём только одобренные метки.
+        // Управляющим/разработчику отдаём все, чтобы работали режим проверки и модерация.
         IQueryable<PlacemarkModel> query = _db.Placemarks;
-        if (!User.Identity!.IsAuthenticated)
+        var canModerate = User.Identity?.IsAuthenticated == true &&
+                          (User.IsInRole("Manager") || User.IsInRole("Developer"));
+        if (!canModerate)
             query = query.Where(p => p.VerificationStatus == "approved");
         var placemarks = await query.ToListAsync();
         return Ok(placemarks.Select(ToDto).ToList());
@@ -136,6 +136,7 @@ public class PlacemarksController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Manager,Developer")]
     public async Task<IActionResult> Update(int id, PlacemarkModel updated)
     {
         if (!ModelState.IsValid)
@@ -214,6 +215,7 @@ public class PlacemarksController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Manager,Developer")]
     public async Task<IActionResult> Delete(int id)
     {
         var placemark = await _db.Placemarks.FindAsync(id);
@@ -222,15 +224,6 @@ public class PlacemarksController : ControllerBase
             return NotFound();
         }
 
-        _db.ActivityLogs.Add(new ActivityLog
-        {
-            Type = "action",
-            UserName = User.Identity?.Name,
-            Description = $"Удалена метка «{placemark.Name}»",
-            IpAddress = HttpContext?.Connection?.RemoteIpAddress?.ToString()
-        });
-        _db.Placemarks.Remove(placemark);
-        await _db.SaveChangesAsync();
         try
         {
             _db.ActivityLogs.Add(new ActivityLog
@@ -240,9 +233,10 @@ public class PlacemarksController : ControllerBase
                 Description = $"Удалена метка «{placemark.Name}»",
                 IpAddress = HttpContext?.Connection?.RemoteIpAddress?.ToString()
             });
-            await _db.SaveChangesAsync();
         }
         catch { }
+        _db.Placemarks.Remove(placemark);
+        await _db.SaveChangesAsync();
         return Ok();
     }
 

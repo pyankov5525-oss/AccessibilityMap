@@ -35,6 +35,7 @@
         var accessibilityMode = false;
         var verifyMode = false;
         var canVerify = false;
+        var canManagePlacemarks = false;
         var placemarksData = [];
         var placemarkObjects = {};
         var dotNetRef;
@@ -73,22 +74,27 @@
                     });
                     try { map.controls.remove('routeButton'); } catch (e) {}
 
-                    var accessibilityButton = new ymaps.control.Button({
-                        data: { title: 'Доступность' },
+                    var verifyHtml = window.canVerify
+                        ? '<button id="modeVerifyBtn" onclick="setMapMode(\'verify\')" style="padding:9px 12px; border:0; border-left:1px solid rgba(255,255,255,.18); cursor:pointer; font-weight:700; color:#fff; background:#242c36;">Проверка меток</button>'
+                        : '';
+                    var modeSwitcher = new ymaps.control.Button({
+                        data: { title: 'Режим карты' },
                         options: {
-                            maxWidth: 220,
+                            maxWidth: 520,
                             layout: ymaps.templateLayoutFactory.createClass(
-                                '<button style="padding:10px 18px; font-size:15px; font-weight:600; border:2px solid #3b82f6; border-radius:8px; cursor:pointer; background:#3b82f6; color:#fff; white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,.35);">♿ Доступность</button>'
+                                '<div id="mapModeSwitcher" style="display:flex; overflow:hidden; border:2px solid #3b82f6; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,.35); background:#161c24; font-size:14px; white-space:nowrap;">' +
+                                '<button id="modeNormalBtn" onclick="setMapMode(\'normal\')" style="padding:9px 12px; border:0; cursor:pointer; font-weight:700; color:#fff; background:#242c36;">Обычная карта</button>' +
+                                '<button id="modeAccessBtn" onclick="setMapMode(\'accessibility\')" style="padding:9px 12px; border:0; border-left:1px solid rgba(255,255,255,.18); cursor:pointer; font-weight:700; color:#fff; background:#242c36;">Доступность</button>' +
+                                verifyHtml +
+                                '</div>'
                             )
                         }
                     });
-                    accessibilityButton.events.add('click', function () {
-                        toggleAccessibilityMode();
-                    });
-                    map.controls.add(accessibilityButton, { float: 'right', position: { top: 55, right: 10 } });
+                    map.controls.add(modeSwitcher, { float: 'right', position: { top: 55, right: 10 } });
+                    setTimeout(function () { restoreMapMode(); renderModeSwitcher(); }, 100);
 
                     map.events.add('click', function (e) {
-                        if (!accessibilityMode || !dotNetRef) return;
+                        if (!accessibilityMode || verifyMode || !dotNetRef) return;
                         var target = e.get('target');
                         if (target && target.geometry && target.properties && target.properties.get && target.properties.get('name')) {
                             // Клик по организации Яндекса (магазин, аптека и т.п.)
@@ -117,21 +123,6 @@
                         }
                     });
                     map.controls.add(searchButton, { float: 'left', position: { top: 10, left: 10 } });
-
-                    // Кнопка «режим проверки» — только для управляющего/разработчика
-                    if (window.canVerify) {
-                        var verifyButton = new ymaps.control.Button({
-                            data: { title: 'Режим проверки' },
-                            options: {
-                                maxWidth: 220,
-                                layout: ymaps.templateLayoutFactory.createClass(
-                                    '<button style="padding:10px 18px; font-size:15px; font-weight:600; border:2px solid #9C27B0; border-radius:8px; cursor:pointer; background:#9C27B0; color:#fff; white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,.35);">🔍 Режим проверки</button>'
-                                )
-                            }
-                        });
-                        verifyButton.events.add('click', function () { toggleVerifyMode(); });
-                        map.controls.add(verifyButton, { float: 'right', position: { top: 100, right: 10 } });
-                    }
 
                         setTimeout(function () {
                             var btn = document.getElementById('customSearchBtn');
@@ -174,33 +165,56 @@
         }
 
         function toggleAccessibilityMode() {
-            accessibilityMode = !accessibilityMode;
-            if (!accessibilityMode) verifyMode = false;
-            if (accessibilityMode) {
-                map.behaviors.disable('drag');
-                setTimeout(function () { map.behaviors.enable('drag'); }, 100);
-            }
-            showPlacemarks();
-            updateCounter();
-            if (dotNetRef) {
-                dotNetRef.invokeMethodAsync('OnAccessibilityModeChanged', accessibilityMode).catch(function(){});
-                if (!accessibilityMode) dotNetRef.invokeMethodAsync('OnVerifyModeChanged', false).catch(function(){});
-            }
+            setMapMode(accessibilityMode ? 'normal' : 'accessibility');
         }
 
         function setCanVerify(v) {
             window.canVerify = !!v;
         }
 
-        function toggleVerifyMode() {
-            verifyMode = !verifyMode;
-            if (verifyMode && !accessibilityMode) {
-                accessibilityMode = true;
-                if (dotNetRef) dotNetRef.invokeMethodAsync('OnAccessibilityModeChanged', true).catch(function(){});
-            }
+        function setCanManagePlacemarks(v) {
+            canManagePlacemarks = !!v;
+        }
+
+        function setMapMode(mode) {
+            if (mode === 'verify' && !window.canVerify) mode = 'normal';
+            accessibilityMode = mode === 'accessibility' || mode === 'verify';
+            verifyMode = mode === 'verify';
+            try { localStorage.setItem('am_map_mode', mode); } catch (e) {}
             showPlacemarks();
             updateCounter();
-            if (dotNetRef) dotNetRef.invokeMethodAsync('OnVerifyModeChanged', verifyMode).catch(function(){});
+            renderModeSwitcher();
+            if (dotNetRef) {
+                dotNetRef.invokeMethodAsync('OnAccessibilityModeChanged', accessibilityMode).catch(function(){});
+                dotNetRef.invokeMethodAsync('OnVerifyModeChanged', verifyMode).catch(function(){});
+            }
+        }
+
+        function restoreMapMode() {
+            var mode = 'normal';
+            try { mode = localStorage.getItem('am_map_mode') || 'normal'; } catch (e) {}
+            if (mode === 'verify' && !window.canVerify) mode = 'normal';
+            setMapMode(mode);
+        }
+
+        function renderModeSwitcher() {
+            var mode = verifyMode ? 'verify' : (accessibilityMode ? 'accessibility' : 'normal');
+            var buttons = [
+                { id: 'modeNormalBtn', mode: 'normal', color: '#3b82f6' },
+                { id: 'modeAccessBtn', mode: 'accessibility', color: '#22c55e' },
+                { id: 'modeVerifyBtn', mode: 'verify', color: '#9C27B0' }
+            ];
+            buttons.forEach(function (b) {
+                var el = document.getElementById(b.id);
+                if (!el) return;
+                var active = mode === b.mode;
+                el.style.background = active ? b.color : '#242c36';
+                el.style.color = active ? '#fff' : '#d7dde7';
+            });
+        }
+
+        function toggleVerifyMode() {
+            setMapMode(verifyMode ? 'accessibility' : 'verify');
         }
 
         // Переход к конкретной метке из вкладки «Проверка» (глубокая ссылка /?focus=<id>)
@@ -209,9 +223,10 @@
             function tryFocus() {
                 var p = placemarksData.find(function (x) { return x.id === id; });
                 if (!p || !map) { if (attempt++ < 12) setTimeout(tryFocus, 300); return; }
-                if (!accessibilityMode) {
-                    accessibilityMode = true;
-                    if (dotNetRef) dotNetRef.invokeMethodAsync('OnAccessibilityModeChanged', true).catch(function(){});
+                if (window.canVerify) {
+                    setMapMode('verify');
+                } else if (!accessibilityMode) {
+                    setMapMode('accessibility');
                 }
                 showPlacemarks();
                 updateCounter();
@@ -282,6 +297,10 @@
                     }
 
                     var photo = (p.photoUrl ? '<img src="' + p.photoUrl + '" style="width:100%; max-width:230px; border-radius:6px; margin:6px 0;" />' : '');
+                    var actions = canManagePlacemarks
+                        ? '<button onclick="editPlacemark(' + p.id + ')" style="padding:4px 10px; background:#2196F3; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px; margin-right:4px;">✏️ Изменить</button>' +
+                          '<button onclick="deletePlacemark(' + p.id + ')" style="padding:4px 10px; background:#F44336; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px;">🗑 Удалить</button>'
+                        : '';
 
                     var content =
                         '<div style="font-family:sans-serif; max-width:250px;">' +
@@ -294,8 +313,7 @@
                         photo +
                         scores +
                         (p.notes ? '<div style="font-size:11px; color:#888; margin-top:8px; font-style:italic;">📝 ' + p.notes + '</div>' : '') +
-                        '<button onclick="editPlacemark(' + p.id + ')" style="padding:4px 10px; background:#2196F3; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px; margin-right:4px;">✏️ Изменить</button>' +
-                        '<button onclick="deletePlacemark(' + p.id + ')" style="padding:4px 10px; background:#F44336; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px;">🗑 Удалить</button>' +
+                        actions +
                         '</div>';
 
                     var pm = new ymaps.Placemark([p.latitude, p.longitude], {

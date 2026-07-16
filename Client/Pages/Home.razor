@@ -26,13 +26,17 @@
         </div>
     }
 
-    @if (accessibilityMode)
+    @if (verifyMode)
     {
-        <div class="map-banner">♿ Режим доступности включён — кликните по карте, чтобы добавить объект. Ещё раз нажмите «♿ Доступность», чтобы выйти.</div>
+        <div class="map-banner">🔍 Проверка меток включена — показаны только серые метки на модерации.</div>
+    }
+    else if (accessibilityMode)
+    {
+        <div class="map-banner">♿ Режим доступности включён — показаны одобренные метки. Кликните по карте, чтобы добавить объект.</div>
     }
     else
     {
-        <div class="map-hint">Включите кнопку «♿ Доступность», чтобы увидеть и добавить метки доступности.</div>
+        <div class="map-hint">Выберите переключатель «Доступность» или «Проверка меток» справа сверху.</div>
     }
 
     @if (showForm)
@@ -145,6 +149,7 @@
                 dotNetRef = DotNetObjectReference.Create(this);
                 await JS.InvokeVoidAsync("setDotNetRef", dotNetRef);
                 await JS.InvokeVoidAsync("setCanVerify", Auth.Role == "Developer" || Auth.Role == "Manager");
+                await JS.InvokeVoidAsync("setCanManagePlacemarks", Auth.Role == "Developer" || Auth.Role == "Manager");
                 await LoadPlacemarks();
 
                 var query = new Uri(Navigation.Uri).Query;
@@ -283,6 +288,7 @@
     [JSInvokable]
     public async Task EditPlacemark(int id)
     {
+        if (Auth.Role != "Developer" && Auth.Role != "Manager") return;
         try
         {
             var placemark = await Http.GetFromJsonAsync<PlacemarkData>($"/api/placemarks/{id}");
@@ -317,6 +323,7 @@
     [JSInvokable]
     public async Task DeletePlacemark(int id)
     {
+        if (Auth.Role != "Developer" && Auth.Role != "Manager") return;
         await Http.DeleteAsync($"/api/placemarks/{id}");
         await LoadPlacemarks();
     }

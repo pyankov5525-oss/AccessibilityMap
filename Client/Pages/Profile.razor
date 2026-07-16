@@ -129,7 +129,10 @@ else
             }
             else if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
-                Navigation.NavigateTo("");
+                await Auth.ClearAsync();
+                profile = null;
+                message = "Сессия устарела. Войдите заново и снова откройте профиль.";
+                isError = true;
             }
         }
         catch (Exception ex)
