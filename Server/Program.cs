@@ -27,20 +27,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 {
     if (usePostgres)
     {
-        // Neon/Supabase выдают postgres:// — Npgsql нужен префикс postgresql://
-        var pg = connectionString.Replace("postgres://", "postgresql://", StringComparison.OrdinalIgnoreCase);
-
-        // Облачные базы (Supabase/Neon) требуют SSL. По умолчанию Npgsql стоит
-        // SslMode=Prefer — принудительно включаем Require, если пользователь
-        // не задал режим SSL сам. Для локального Postgres без SSL это не сработает,
-        // но для Supabase/Neon обязательно.
-        var pgBuilder = new NpgsqlConnectionStringBuilder(pg);
-        if (pgBuilder.SslMode == SslMode.Prefer || pgBuilder.SslMode == SslMode.Disable)
-        {
-            pgBuilder.SslMode = SslMode.Require;
-        }
-
-        options.UseNpgsql(pgBuilder.ConnectionString);
+        var pgConnectionString = BuildPostgresConnectionString(connectionString!);
+        options.UseNpgsql(pgConnectionString);
     }
     else
     {
@@ -136,6 +124,46 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.Run();
+
+
+static string BuildPostgresConnectionString(string rawConnectionString)
+{
+    // Render/Supabase часто дают строку в URI-формате:
+    // postgresql://postgres:password@db.xxxxx.supabase.co:5432/postgres
+    // NpgsqlConnectionStringBuilder НЕ понимает такой формат напрямую,
+    // поэтому аккуратно переводим URI в обычный формат Host=...;Username=...
+    if (rawConnectionString.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) ||
+        rawConnectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
+    {
+        var uri = new Uri(rawConnectionString);
+        var userInfo = uri.UserInfo.Split(':', 2);
+        var username = Uri.UnescapeDataString(userInfo.ElementAtOrDefault(0) ?? string.Empty);
+        var password = Uri.UnescapeDataString(userInfo.ElementAtOrDefault(1) ?? string.Empty);
+        var database = uri.AbsolutePath.TrimStart('/');
+
+        var builder = new NpgsqlConnectionStringBuilder
+        {
+            Host = uri.Host,
+            Port = uri.Port > 0 ? uri.Port : 5432,
+            Database = string.IsNullOrWhiteSpace(database) ? "postgres" : Uri.UnescapeDataString(database),
+            Username = username,
+            Password = password,
+            SslMode = SslMode.Require,
+            Pooling = true
+        };
+
+        return builder.ConnectionString;
+    }
+
+    // Если строка уже в формате Npgsql: Host=...;Database=...;Username=...
+    var pgBuilder = new NpgsqlConnectionStringBuilder(rawConnectionString);
+    if (pgBuilder.SslMode == SslMode.Prefer || pgBuilder.SslMode == SslMode.Disable)
+    {
+        pgBuilder.SslMode = SslMode.Require;
+    }
+
+    return pgBuilder.ConnectionString;
+}
 
 static async Task SeedRolesAndAdminAsync(IServiceProvider services)
 {
