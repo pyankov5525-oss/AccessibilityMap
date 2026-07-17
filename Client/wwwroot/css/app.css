@@ -656,3 +656,62 @@ body.theme-light .map-filters { background: rgba(255,255,255,.94); }
 .ymaps-2-1-79-copyright__link,
 .ymaps-2-1-79-map-copyrights-promo,
 .ymaps-2-1-79-copyright_logo_no { display:none !important; }
+
+/* Переключатели темы и размера шрифта */
+.ui-controls { margin-left:auto; }
+.theme-switch,
+.font-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+}
+.theme-btn,
+.font-btn {
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text);
+  font-weight: 800;
+}
+.theme-btn { font-size: 22px; padding: 7px 12px; min-width: 48px; }
+.font-btn { font-size: 14px; padding: 8px 12px; }
+.theme-btn.active,
+.font-btn.active {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,.22);
+}
+body.theme-light .topbar,
+body.theme-light .form-card,
+body.theme-light .places-table,
+body.theme-light .detail-panel,
+body.theme-light .login-card,
+body.theme-light .filter-drawer,
+body.theme-light .map-info-panel,
+body.theme-light .about-card,
+body.theme-light .attachment-card,
+body.theme-light .modal-card-custom {
+  background: #fff;
+  color: var(--text);
+}
+body.theme-light .chip,
+body.theme-light .subtab,
+body.theme-light .score-btn,
+body.theme-light .stat,
+body.theme-light .btn-secondary {
+  background: #eef2f7;
+  color: #172033;
+}
+body.theme-light .muted { color: #596579; }
+body.theme-light .form-control {
+  background: #f8fafc;
+  color: #172033;
+}
+body.theme-light .map-hint { background: rgba(255,255,255,.94); color:#596579; }
+body.theme-light .map-banner { background: rgba(37,99,235,.92); }
+@media (max-width:760px){ .ui-controls{margin-left:0}.theme-btn{font-size:20px;min-width:44px}.font-btn{padding:7px 10px} }

@@ -296,6 +296,7 @@ public class AuthController : ControllerBase
         var result = await _userManager.UpdateAsync(user);
         if (!result.Succeeded)
             return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
+        await UpdatePlacemarkAuthorNameAsync(user);
         return Ok(new { ok = true });
     }
 
@@ -313,7 +314,22 @@ public class AuthController : ControllerBase
         var result = await _userManager.UpdateAsync(user);
         if (!result.Succeeded)
             return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
+        await UpdatePlacemarkAuthorNameAsync(user);
         return Ok(new { ok = true });
+    }
+
+
+    private async Task UpdatePlacemarkAuthorNameAsync(ApplicationUser user)
+    {
+        try
+        {
+            var marks = _db.Placemarks.Where(p => p.CreatedByUserId == user.Id).ToList();
+            foreach (var m in marks)
+                m.CreatedByFullName = user.FullName;
+            if (marks.Count > 0)
+                await _db.SaveChangesAsync();
+        }
+        catch { }
     }
 
     public class RoleModel

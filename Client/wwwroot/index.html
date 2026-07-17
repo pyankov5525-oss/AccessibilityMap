@@ -13,7 +13,7 @@
     <script src="https://api-maps.yandex.ru/2.1/?apikey=d803c1da-b012-4e3b-b0f7-72ddf1c0208a&lang=ru_RU&load=package.full" defer></script>
 </head>
 
-<body>
+<body class="theme-light font-medium">
     <div id="app">
         <svg class="loading-progress">
             <circle r="40%" cx="50%" cy="50%" />
@@ -42,6 +42,7 @@
         var dotNetRef;
         var currentFilter = 'all';
         var currentCategoryFilter = [];
+        var pendingCountForCounter = 0;
         var markerClusterer = null;
 
         function setDotNetRef(ref) {
@@ -53,10 +54,10 @@
         }
 
         function applyUiPrefs() {
-            var theme = getUiPreference('am_theme', 'dark');
+            var theme = getUiPreference('am_theme', 'light');
             var font = getUiPreference('am_font', 'medium');
             document.body.classList.toggle('theme-light', theme === 'light');
-            document.body.classList.toggle('theme-dark', theme !== 'light');
+            document.body.classList.toggle('theme-dark', theme === 'dark');
             document.body.classList.remove('font-small', 'font-medium', 'font-large');
             document.body.classList.add('font-' + font);
         }
@@ -64,11 +65,17 @@
         function setThemePreference(theme) {
             try { localStorage.setItem('am_theme', theme); } catch (e) {}
             applyUiPrefs();
+            renderModeSwitcher();
         }
 
         function setFontPreference(font) {
             try { localStorage.setItem('am_font', font); } catch (e) {}
             applyUiPrefs();
+        }
+
+        function closeMapPanels() {
+            hidePlacemarkPanel();
+            try { if (map && map.balloon) map.balloon.close(); } catch(e) {}
         }
 
         applyUiPrefs();
@@ -177,15 +184,15 @@
                     setTimeout(function () { restoreMapMode(); renderModeSwitcher(); }, 100);
 
                     map.events.add('click', function (e) {
-                        if (!accessibilityMode || verifyMode || !dotNetRef || !canAddPlacemark) return;
+                        if (!accessibilityMode || verifyMode || !dotNetRef) return;
                         var target = e.get('target');
                         if (target && target.geometry && target.properties && target.properties.get && target.properties.get('name')) {
                             // Клик по организации Яндекса (магазин, аптека и т.п.)
                             var coords = target.geometry.getCoordinates();
                             var name = target.properties.get('name') || '';
                             var addr = (target.properties.get('description') || target.properties.get('text') || '').toString();
-                            dotNetRef.invokeMethodAsync('OnPoiClick', coords[0], coords[1], name, addr).catch(function(){});
-                        } else {
+                            if (canAddPlacemark) dotNetRef.invokeMethodAsync('OnPoiClick', coords[0], coords[1], name, addr).catch(function(){});
+                        } else if (canAddPlacemark) {
                             var coords = e.get('coords');
                             dotNetRef.invokeMethodAsync('OnMapClickWithCoords', coords[0], coords[1]);
                         }
@@ -265,8 +272,9 @@
                 var el = document.getElementById(b.id);
                 if (!el) return;
                 var active = mode === b.mode;
-                el.style.background = active ? b.color : '#242c36';
-                el.style.color = active ? '#fff' : '#d7dde7';
+                var isLight = document.body.classList.contains('theme-light');
+                el.style.background = active ? b.color : (isLight ? '#eef2f7' : '#242c36');
+                el.style.color = active ? '#fff' : (isLight ? '#172033' : '#d7dde7');
             });
         }
 
@@ -301,7 +309,7 @@
             } else {
                 list = list.filter(function (p) { return !p.verificationStatus || p.verificationStatus === 'approved' || (canAddPlacemark && p.verificationStatus === 'pending'); });
                 if (currentFilter !== 'all') {
-                    list = list.filter(function (p) { return p.level === currentFilter; });
+                    list = list.filter(function (p) { return p.verificationStatus === 'pending' || p.level === currentFilter; });
                 }
                 if (currentCategoryFilter.length > 0) {
                     list = list.filter(function (p) { return currentCategoryFilter.indexOf(p.category || '') >= 0; });
@@ -314,14 +322,16 @@
             if (!dotNetRef) return;
             var list = getVisiblePlacemarks();
             if (!accessibilityMode) {
-                dotNetRef.invokeMethodAsync('UpdateCounter', 0, 0, 0, 0).catch(function(){});
+                dotNetRef.invokeMethodAsync('UpdateCounter', 0, 0, 0, 0, 0).catch(function(){});
                 return;
             }
             var total = list.length;
-            var green = list.filter(function (p) { return p.level === 'green'; }).length;
-            var gold = list.filter(function (p) { return p.level === 'gold'; }).length;
-            var red = list.filter(function (p) { return p.level === 'red'; }).length;
-            dotNetRef.invokeMethodAsync('UpdateCounter', total, green, gold, red).catch(function(){});
+            var pending = list.filter(function (p) { return p.verificationStatus === 'pending'; }).length;
+            var approvedList = list.filter(function(p){ return p.verificationStatus !== 'pending'; });
+            var green = approvedList.filter(function (p) { return p.level === 'green'; }).length;
+            var gold = approvedList.filter(function (p) { return p.level === 'gold'; }).length;
+            var red = approvedList.filter(function (p) { return p.level === 'red'; }).length;
+            dotNetRef.invokeMethodAsync('UpdateCounter', total, green, gold, red, pending).catch(function(){});
         }
 
         function escapeHtml(v) {
@@ -492,12 +502,19 @@
 
         function votePlacemark(id, value) {
             fetch('/api/placemarks/' + id + '/vote', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: value })
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: value })
             }).then(function(r){ return r.json(); }).then(function(v){
                 var p = (placemarksData || []).find(function(x){ return x.id === id; });
-                if (p) { p.likes = v.likes; p.dislikes = v.dislikes; openBalloon(id); }
-            }).catch(function(){});
+                if (p) { p.likes = v.likes ?? v.Likes ?? p.likes; p.dislikes = v.dislikes ?? v.Dislikes ?? p.dislikes; openBalloon(id); }
+            }).catch(function(e){ console.error('vote failed', e); });
         }
+        window.votePlacemark = votePlacemark;
+        window.showPhotoGallery = showPhotoGallery;
+        window.hidePlacemarkPanel = hidePlacemarkPanel;
+        window.openBalloon = openBalloon;
+        window.closeMapPanels = closeMapPanels;
 
         function showSuggestions(items) {
             var box = document.getElementById('customSearchSuggest');

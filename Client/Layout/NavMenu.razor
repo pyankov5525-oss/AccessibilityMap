@@ -2,44 +2,44 @@
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject IJSRuntime JS
-@implements IAsyncDisposable
+@implements IDisposable
 
 <div class="topbar">
-    <a class="brand" href="">♿ Карта доступности</a>
+    <a class="brand" href="" @onclick="ClosePanels">♿ Карта доступности</a>
     <nav class="nav-links">
-        <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Карта</NavLink>
-        <NavLink class="nav-link" href="places">Список</NavLink>
-        <NavLink class="nav-link" href="about">О проекте</NavLink>
-        @if (Auth.IsAuthenticated)
-        {
-            <NavLink class="nav-link" href="profile">Профиль</NavLink>
-        }
+        <NavLink class="nav-link" href="" Match="NavLinkMatch.All" @onclick="ClosePanels">Карта</NavLink>
+        <NavLink class="nav-link" href="places" @onclick="ClosePanels">Список</NavLink>
         @if (Auth.Role == "Manager" || Auth.Role == "Developer")
         {
-            <NavLink class="nav-link" href="verify">Проверка</NavLink>
-            <NavLink class="nav-link" href="users">Пользователи</NavLink>
-            <NavLink class="nav-link" href="attachments">Вложения</NavLink>
+            <NavLink class="nav-link" href="verify" @onclick="ClosePanels">Проверка</NavLink>
+            <NavLink class="nav-link" href="users" @onclick="ClosePanels">Пользователи</NavLink>
+            <NavLink class="nav-link" href="attachments" @onclick="ClosePanels">Вложения</NavLink>
         }
         @if (Auth.Role == "Developer")
         {
-            <NavLink class="nav-link" href="logs">Журнал</NavLink>
+            <NavLink class="nav-link" href="logs" @onclick="ClosePanels">Журнал</NavLink>
         }
+        @if (Auth.IsAuthenticated)
+        {
+            <NavLink class="nav-link" href="profile" @onclick="ClosePanels">Профиль</NavLink>
+        }
+        <NavLink class="nav-link" href="about" @onclick="ClosePanels">О проекте</NavLink>
         @if (!Auth.IsAuthenticated)
         {
-            <NavLink class="nav-link nav-login" href="login">Вход</NavLink>
+            <NavLink class="nav-link nav-login" href="login" @onclick="ClosePanels">Вход</NavLink>
         }
     </nav>
 
     <div class="ui-controls">
-        <select class="form-control form-control-sm ui-select" value="@theme" @onchange="ChangeTheme" title="Тема">
-            <option value="dark">Тёмная</option>
-            <option value="light">Светлая</option>
-        </select>
-        <select class="form-control form-control-sm ui-select" value="@fontSize" @onchange="ChangeFont" title="Размер шрифта">
-            <option value="small">Шрифт S</option>
-            <option value="medium">Шрифт M</option>
-            <option value="large">Шрифт L</option>
-        </select>
+        <div class="theme-switch" title="Тема">
+            <button class="theme-btn @(theme == "light" ? "active" : "")" @onclick='@(() => SetTheme("light"))'>☀️</button>
+            <button class="theme-btn @(theme == "dark" ? "active" : "")" @onclick='@(() => SetTheme("dark"))'>🌙</button>
+        </div>
+        <div class="font-switch" title="Размер шрифта">
+            <button class="font-btn @(fontSize == "small" ? "active" : "")" @onclick='@(() => SetFont("small"))'>Мал</button>
+            <button class="font-btn @(fontSize == "medium" ? "active" : "")" @onclick='@(() => SetFont("medium"))'>Сред</button>
+            <button class="font-btn @(fontSize == "large" ? "active" : "")" @onclick='@(() => SetFont("large"))'>Больш</button>
+        </div>
     </div>
 
     <div class="user-box">
@@ -60,8 +60,15 @@
 }
 
 @code {
-    private string theme = "dark";
+    private string theme = "light";
     private string fontSize = "medium";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Auth.OnChange += HandleAuthChanged;
+        Nav.LocationChanged += HandleLocationChanged;
+        await Task.CompletedTask;
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -69,7 +76,7 @@
         {
             try
             {
-                theme = await JS.InvokeAsync<string>("getUiPreference", "am_theme", "dark");
+                theme = await JS.InvokeAsync<string>("getUiPreference", "am_theme", "light");
                 fontSize = await JS.InvokeAsync<string>("getUiPreference", "am_font", "medium");
                 await JS.InvokeVoidAsync("applyUiPrefs");
                 StateHasChanged();
@@ -77,6 +84,9 @@
             catch { }
         }
     }
+
+    private void HandleAuthChanged() => InvokeAsync(StateHasChanged);
+    private void HandleLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e) => _ = ClosePanels();
 
     private string RoleRu => Auth.Role switch
     {
@@ -86,27 +96,34 @@
         _ => Auth.Role
     };
 
-    private async Task ChangeTheme(ChangeEventArgs e)
+    private async Task SetTheme(string value)
     {
-        theme = e.Value?.ToString() ?? "dark";
+        theme = value;
         await JS.InvokeVoidAsync("setThemePreference", theme);
     }
 
-    private async Task ChangeFont(ChangeEventArgs e)
+    private async Task SetFont(string value)
     {
-        fontSize = e.Value?.ToString() ?? "medium";
+        fontSize = value;
         await JS.InvokeVoidAsync("setFontPreference", fontSize);
+    }
+
+    private async Task ClosePanels()
+    {
+        try { await JS.InvokeVoidAsync("closeMapPanels"); } catch { }
     }
 
     private async Task Logout()
     {
         try { await Http.PostAsync("/api/auth/logout", null); } catch { }
         await Auth.ClearAsync();
+        await ClosePanels();
         Nav.NavigateTo("");
     }
 
-    public async ValueTask DisposeAsync()
+    public void Dispose()
     {
-        await Task.CompletedTask;
+        Auth.OnChange -= HandleAuthChanged;
+        Nav.LocationChanged -= HandleLocationChanged;
     }
 }

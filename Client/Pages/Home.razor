@@ -8,7 +8,7 @@
 <div class="map-page">
     <div id="map" class="map"></div>
 
-    <button class="btn btn-primary filter-fab" @onclick="@(() => showFilters = !showFilters)">🔎 Фильтры</button>
+    <button class="btn btn-primary filter-fab" @onclick="OpenFilters">🔎 Фильтры</button>
     @if (showFilters)
     {
         <div class="filter-drawer">
@@ -24,9 +24,13 @@
             @foreach (var cat in CategoryOptions)
             {
                 <label class="chip" style="display:inline-flex;gap:6px;margin:3px;">
-                    <input type="checkbox" checked="@SelectedCategories.Contains(cat.Value)" @onchange="e => ToggleCategory(cat.Value, e.Value)" /> @cat.Label
+                    <input type="checkbox" checked="@DraftCategories.Contains(cat.Value)" @onchange="e => ToggleDraftCategory(cat.Value, e.Value)" /> @cat.Label
                 </label>
             }
+            <div class="form-actions" style="margin-top:10px;">
+                <button class="btn btn-success" @onclick="ApplyFilters">Применить</button>
+                <button class="btn btn-secondary" @onclick="ResetFilters">Сбросить</button>
+            </div>
         </div>
     }
 
@@ -37,6 +41,7 @@
             <div class="stat stat-green"><b>@greenCount</b><span>доступно</span></div>
             <div class="stat stat-gold"><b>@goldCount</b><span>частично</span></div>
             <div class="stat stat-red"><b>@redCount</b><span>недоступно</span></div>
+            <div class="stat"><b>@pendingCount</b><span>на проверке</span></div>
         </div>
     }
 
@@ -140,14 +145,22 @@
     private int greenCount = 0;
     private int goldCount = 0;
     private int redCount = 0;
+    private int pendingCount = 0;
     private bool showCounter = false;
 
     private string currentFilter = "all";
     private bool showFilters = false;
     private HashSet<string> SelectedCategories = new();
+    private HashSet<string> DraftCategories = new();
     private readonly (string Value, string Label)[] CategoryOptions = new[] { ("Поликлиника", "🏥 Поликлиники"), ("Аптека", "💊 Аптеки"), ("Магазин", "🛒 Магазины"), ("Администрация", "🏛️ Администрация"), ("Культура", "🎭 Культура"), ("Образование", "🎓 Образование"), ("Другое", "📍 Другое") };
 
     private const long MaxPhotoSize = 5 * 1024 * 1024;
+
+    private void OpenFilters()
+    {
+        DraftCategories = SelectedCategories.ToHashSet();
+        showFilters = !showFilters;
+    }
 
     private async Task SetFilterAll() => await SetFilter("all");
     private async Task SetFilterGreen() => await SetFilter("green");
@@ -160,11 +173,26 @@
         await JS.InvokeVoidAsync("setFilter", filter);
     }
 
-    private async Task ToggleCategory(string category, object? value)
+    private void ToggleDraftCategory(string category, object? value)
     {
         var selected = value is bool b && b;
-        if (selected) SelectedCategories.Add(category); else SelectedCategories.Remove(category);
+        if (selected) DraftCategories.Add(category); else DraftCategories.Remove(category);
+    }
+
+    private async Task ApplyFilters()
+    {
+        SelectedCategories = DraftCategories.ToHashSet();
         await JS.InvokeVoidAsync("setCategoryFilter", SelectedCategories.ToArray());
+        showFilters = false;
+    }
+
+    private async Task ResetFilters()
+    {
+        currentFilter = "all";
+        SelectedCategories.Clear();
+        DraftCategories.Clear();
+        await JS.InvokeVoidAsync("setFilter", "all");
+        await JS.InvokeVoidAsync("setCategoryFilter", Array.Empty<string>());
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -203,12 +231,13 @@
     }
 
     [JSInvokable]
-    public void UpdateCounter(int total, int green, int gold, int red)
+    public void UpdateCounter(int total, int green, int gold, int red, int pending)
     {
         totalCount = total;
         greenCount = green;
         goldCount = gold;
         redCount = red;
+        pendingCount = pending;
         showCounter = total > 0;
         StateHasChanged();
     }
