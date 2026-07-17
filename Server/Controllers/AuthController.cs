@@ -86,7 +86,7 @@ public class AuthController : ControllerBase
             await _db.SaveChangesAsync();
         }
         catch { }
-        return Ok(new { token, userName = user.UserName, role = roles.FirstOrDefault() });
+        return Ok(new { token, userName = user.UserName, role = roles.FirstOrDefault(), profileComplete = IsProfileComplete(user) });
     }
 
     [HttpGet("me")]
@@ -104,7 +104,8 @@ public class AuthController : ControllerBase
             fullName = user.FullName,
             dateOfBirth = user.DateOfBirth,
             status = user.Status,
-            about = user.About
+            about = user.About,
+            profileComplete = IsProfileComplete(user)
         });
     }
 
@@ -132,9 +133,6 @@ public class AuthController : ControllerBase
 
     private async Task<IActionResult> CreateUser(string role, string fullName, string dateOfBirth)
     {
-        var validation = ValidateProfileRequired(fullName, dateOfBirth);
-        if (validation != null) return validation;
-
         var login = GenerateLogin();
         var password = GeneratePassword();
         var user = new ApplicationUser
@@ -142,8 +140,8 @@ public class AuthController : ControllerBase
             UserName = login,
             EmailConfirmed = true,
             Status = "active",
-            FullName = fullName.Trim(),
-            DateOfBirth = dateOfBirth.Trim()
+            FullName = fullName?.Trim(),
+            DateOfBirth = dateOfBirth?.Trim()
         };
         var result = await _userManager.CreateAsync(user, password);
         if (!result.Succeeded)
@@ -358,6 +356,10 @@ public class AuthController : ControllerBase
             storage = isPersistent ? "PostgreSQL/Supabase — постоянная база" : "SQLite — временная база Render, данные могут пропадать после деплоя"
         });
     }
+
+
+    private bool IsProfileComplete(ApplicationUser user) =>
+        !string.IsNullOrWhiteSpace(user.FullName) && !string.IsNullOrWhiteSpace(user.DateOfBirth);
 
     private BadRequestObjectResult? ValidateProfileRequired(string fullName, string dateOfBirth)
     {

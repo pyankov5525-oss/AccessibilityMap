@@ -245,6 +245,11 @@ static async Task EnsureUserSchemaAsync(AppDbContext db, bool usePostgres)
             await db.Database.ExecuteSqlRawAsync("ALTER TABLE \"AspNetUsers\" ADD COLUMN IF NOT EXISTS \"DateOfBirth\" text;");
             await db.Database.ExecuteSqlRawAsync("ALTER TABLE \"AspNetUsers\" ADD COLUMN IF NOT EXISTS \"Status\" text;");
             await db.Database.ExecuteSqlRawAsync("ALTER TABLE \"AspNetUsers\" ADD COLUMN IF NOT EXISTS \"About\" text;");
+            await db.Database.ExecuteSqlRawAsync("ALTER TABLE \"Placemarks\" ADD COLUMN IF NOT EXISTS \"PhotoPaths\" text;");
+            await db.Database.ExecuteSqlRawAsync("ALTER TABLE \"Placemarks\" ADD COLUMN IF NOT EXISTS \"CreatedByUserId\" text;");
+            await db.Database.ExecuteSqlRawAsync("ALTER TABLE \"Placemarks\" ADD COLUMN IF NOT EXISTS \"CreatedByFullName\" text;");
+            await db.Database.ExecuteSqlRawAsync("ALTER TABLE \"Placemarks\" ADD COLUMN IF NOT EXISTS \"Likes\" integer NOT NULL DEFAULT 0;");
+            await db.Database.ExecuteSqlRawAsync("ALTER TABLE \"Placemarks\" ADD COLUMN IF NOT EXISTS \"Dislikes\" integer NOT NULL DEFAULT 0;");
         }
         else
         {
@@ -252,12 +257,17 @@ static async Task EnsureUserSchemaAsync(AppDbContext db, bool usePostgres)
             TryAddColumnSqlite(db, "DateOfBirth");
             TryAddColumnSqlite(db, "Status");
             TryAddColumnSqlite(db, "About");
+            TryAddColumnSqlite(db, "PhotoPaths", "Placemarks");
+            TryAddColumnSqlite(db, "CreatedByUserId", "Placemarks");
+            TryAddColumnSqlite(db, "CreatedByFullName", "Placemarks");
+            TryAddColumnSqlite(db, "Likes", "Placemarks", "integer NOT NULL DEFAULT 0");
+            TryAddColumnSqlite(db, "Dislikes", "Placemarks", "integer NOT NULL DEFAULT 0");
         }
     }
     catch { }
 }
 
-static void TryAddColumnSqlite(AppDbContext db, string column)
+static void TryAddColumnSqlite(AppDbContext db, string column, string table = "AspNetUsers", string type = "text")
 {
     try
     {
@@ -267,7 +277,7 @@ static void TryAddColumnSqlite(AppDbContext db, string column)
 
         using (var check = connection.CreateCommand())
         {
-            check.CommandText = "PRAGMA table_info(AspNetUsers);";
+            check.CommandText = $"PRAGMA table_info({table});";
             using var reader = check.ExecuteReader();
             while (reader.Read())
             {
@@ -276,7 +286,10 @@ static void TryAddColumnSqlite(AppDbContext db, string column)
             }
         }
 
-        db.Database.ExecuteSqlRaw("ALTER TABLE AspNetUsers ADD COLUMN " + column + " text;");
+        var allowedTables = new[] { "AspNetUsers", "Placemarks" };
+        var allowedColumns = new[] { "FullName", "DateOfBirth", "Status", "About", "PhotoPaths", "CreatedByUserId", "CreatedByFullName", "Likes", "Dislikes" };
+        if (!allowedTables.Contains(table) || !allowedColumns.Contains(column)) return;
+        db.Database.ExecuteSqlRaw("ALTER TABLE " + table + " ADD COLUMN " + column + " " + type + ";");
     }
     catch { }
 }

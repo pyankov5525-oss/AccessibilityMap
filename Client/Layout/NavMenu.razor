@@ -18,6 +18,7 @@
         {
             <NavLink class="nav-link" href="verify">Проверка</NavLink>
             <NavLink class="nav-link" href="users">Пользователи</NavLink>
+            <NavLink class="nav-link" href="attachments">Вложения</NavLink>
         }
         @if (Auth.Role == "Developer")
         {
@@ -53,6 +54,10 @@
         }
     </div>
 </div>
+@if (Auth.IsAuthenticated && !Auth.ProfileComplete)
+{
+    <div class="profile-required-banner">Заполните ФИО и дату рождения в профиле, иначе рабочие функции недоступны.</div>
+}
 
 @code {
     private string theme = "dark";

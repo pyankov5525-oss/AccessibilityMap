@@ -5,6 +5,7 @@ using AccessibilityMap.Server.Models;
 using Microsoft.Extensions.Http;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using System.Globalization;
 using System.IO;
 
@@ -19,27 +20,27 @@ public class PlacemarksController : ControllerBase
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<PlacemarksController> _logger;
     private readonly IWebHostEnvironment _env;
+    private readonly UserManager<ApplicationUser> _userManager;
     private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
     private const string GeocoderApiKey = "36a55651-ec1b-4152-bbf5-1875ec574586";
 
-    public PlacemarksController(AppDbContext db, IHttpClientFactory httpClientFactory, ILogger<PlacemarksController> logger, IWebHostEnvironment env)
+    public PlacemarksController(AppDbContext db, IHttpClientFactory httpClientFactory, ILogger<PlacemarksController> logger, IWebHostEnvironment env, UserManager<ApplicationUser> userManager)
     {
         _db = db;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
         _env = env;
+        _userManager = userManager;
     }
 
     [HttpGet]
     [AllowAnonymous]
     public async Task<IActionResult> GetAll()
     {
-        // Публичным пользователям и волонтёрам отдаём только одобренные метки.
-        // Управляющим/разработчику отдаём все, чтобы работали режим проверки и модерация.
         IQueryable<PlacemarkModel> query = _db.Placemarks;
-        var canModerate = User.Identity?.IsAuthenticated == true &&
-                          (User.IsInRole("Manager") || User.IsInRole("Developer"));
-        if (!canModerate)
+        // Гость видит только approved. Любой вошедший пользователь видит также pending,
+        // чтобы волонтёры не ставили дубли и понимали, что объект уже на проверке.
+        if (User.Identity?.IsAuthenticated != true)
             query = query.Where(p => p.VerificationStatus == "approved");
         var placemarks = await query.ToListAsync();
         return Ok(placemarks.Select(ToDto).ToList());
@@ -111,12 +112,20 @@ public class PlacemarksController : ControllerBase
             return BadRequest(ModelState);
         }
 
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null) return Unauthorized();
+        if (string.IsNullOrWhiteSpace(user.FullName) || string.IsNullOrWhiteSpace(user.DateOfBirth))
+            return BadRequest(new { error = "Заполните ФИО и дату рождения в профиле, чтобы добавлять метки" });
+
         placemark.CreatedAt = DateTime.UtcNow;
         // Обязательная модерация: новые метки появляются на публичной карте
         // только после одобрения управляющим/разработчиком (verificationStatus=approved).
         placemark.VerificationStatus = "pending";
         // Неодобренные метки живут в БД ~сутки, затем авто-удаляются фоновой службой.
         placemark.ExpiresAt = DateTime.UtcNow.AddHours(24);
+        placemark.CreatedByUserId = user.Id;
+        placemark.CreatedByFullName = user.FullName;
+        placemark.PhotoPaths = NormalizePhotoPaths(placemark.PhotoPaths ?? placemark.PhotoPath);
         _db.Placemarks.Add(placemark);
         await _db.SaveChangesAsync();
         // Лог — «лучшее усилие»: если таблица ещё не создана (старый файл БД), не падаем.
@@ -162,6 +171,7 @@ public class PlacemarksController : ControllerBase
         placemark.ScoreStaff = updated.ScoreStaff;
         placemark.Notes = updated.Notes;
         placemark.PhotoPath = updated.PhotoPath;
+        placemark.PhotoPaths = NormalizePhotoPaths(updated.PhotoPaths ?? updated.PhotoPath);
 
         await _db.SaveChangesAsync();
         return Ok(ToDto(placemark));
@@ -397,9 +407,76 @@ public class PlacemarksController : ControllerBase
         return Ok(ToDto(p));
     }
 
+    [HttpPost("batch-verify")]
+    [Authorize(Roles = "Manager,Developer")]
+    public async Task<IActionResult> BatchVerify([FromBody] BatchVerifyModel model)
+    {
+        if (model.Ids == null || model.Ids.Count == 0) return BadRequest(new { error = "Не выбраны метки" });
+        if (model.Status != "approved" && model.Status != "rejected") return BadRequest(new { error = "Недопустимый статус" });
+        var list = await _db.Placemarks.Where(p => model.Ids.Contains(p.Id)).ToListAsync();
+        foreach (var p in list) p.VerificationStatus = model.Status;
+        await _db.SaveChangesAsync();
+        return Ok(new { count = list.Count });
+    }
+
+    [HttpPost("batch-delete")]
+    [Authorize(Roles = "Manager,Developer")]
+    public async Task<IActionResult> BatchDelete([FromBody] BatchIdsModel model)
+    {
+        if (model.Ids == null || model.Ids.Count == 0) return BadRequest(new { error = "Не выбраны метки" });
+        var list = await _db.Placemarks.Where(p => model.Ids.Contains(p.Id)).ToListAsync();
+        _db.Placemarks.RemoveRange(list);
+        await _db.SaveChangesAsync();
+        return Ok(new { count = list.Count });
+    }
+
+    [HttpPost("{id}/vote")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Vote(int id, [FromBody] VoteModel model)
+    {
+        var p = await _db.Placemarks.FindAsync(id);
+        if (p == null) return NotFound();
+        if (model.Value > 0) p.Likes++;
+        else if (model.Value < 0) p.Dislikes++;
+        else return BadRequest(new { error = "value должен быть 1 или -1" });
+        await _db.SaveChangesAsync();
+        return Ok(new { p.Likes, p.Dislikes });
+    }
+
+    [HttpGet("attachments")]
+    [Authorize(Roles = "Manager,Developer")]
+    public async Task<IActionResult> Attachments()
+    {
+        var list = await _db.Placemarks.ToListAsync();
+        return Ok(list.Where(p => GetPhotos(p).Any()).Select(p => new
+        {
+            p.Id,
+            p.Name,
+            p.Address,
+            p.VerificationStatus,
+            Photos = GetPhotos(p).Select(x => "/api/photos/" + x).ToList()
+        }).ToList());
+    }
+
     public class VerifyModel
     {
         public string Status { get; set; } = "";
+    }
+    public class BatchVerifyModel { public List<int> Ids { get; set; } = new(); public string Status { get; set; } = ""; }
+    public class BatchIdsModel { public List<int> Ids { get; set; } = new(); }
+    public class VoteModel { public int Value { get; set; } }
+
+    private static string NormalizePhotoPaths(string? raw)
+    {
+        var items = (raw ?? "").Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(Path.GetFileName).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().Take(10);
+        return string.Join(';', items);
+    }
+
+    private static List<string> GetPhotos(PlacemarkModel p)
+    {
+        var raw = string.IsNullOrWhiteSpace(p.PhotoPaths) ? p.PhotoPath : p.PhotoPaths;
+        return NormalizePhotoPaths(raw).Split(';', StringSplitOptions.RemoveEmptyEntries).ToList();
     }
 
     private static object ToDto(PlacemarkModel p) => new
@@ -414,9 +491,14 @@ public class PlacemarksController : ControllerBase
         p.Level,
         p.TotalScore,
         p.Notes,
-        PhotoUrl = string.IsNullOrEmpty(p.PhotoPath) ? null : "/api/photos/" + p.PhotoPath,
+        PhotoUrl = GetPhotos(p).FirstOrDefault() is string first ? "/api/photos/" + first : null,
         PhotoPath = p.PhotoPath,
+        PhotoPaths = p.PhotoPaths,
+        Photos = GetPhotos(p).Select(x => "/api/photos/" + x).ToList(),
         VerificationStatus = p.VerificationStatus,
+        CreatedByFullName = p.CreatedByFullName,
+        Likes = p.Likes,
+        Dislikes = p.Dislikes,
         ExpiresAt = p.ExpiresAt,
         Scores = new
         {

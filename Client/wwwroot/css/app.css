@@ -649,3 +649,10 @@ body.theme-light .map-filters { background: rgba(255,255,255,.94); }
   .login-card { width:100%; }
   .score-btn { min-height:28px; font-size:12px; }
 }
+.profile-required-banner{background:#b45309;color:white;padding:8px 14px;text-align:center;font-weight:700}.photo-list{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.photo-chip{display:flex;align-items:center;gap:6px;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:4px 6px}.photo-chip img{width:44px;height:44px;object-fit:cover;border-radius:6px}.photo-chip button{border:0;background:#dc2626;color:white;border-radius:6px;padding:2px 6px}.filter-fab{position:absolute;right:12px;bottom:12px;z-index:130;border-radius:999px;padding:12px 16px}.filter-drawer{position:absolute;right:12px;bottom:64px;z-index:130;width:330px;max-width:calc(100vw - 24px);max-height:48vh;overflow:auto;background:var(--bg-elev);border:1px solid var(--border);border-radius:14px;padding:12px;box-shadow:0 12px 35px rgba(0,0,0,.35)}.likes-row{display:flex;gap:8px;margin-top:10px}.likes-row button{border:1px solid var(--border);background:var(--bg-input);color:var(--text);border-radius:8px;padding:6px 10px}.attachments-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}.attachment-card{background:var(--bg-elev);border:1px solid var(--border);border-radius:14px;padding:12px}.attachment-photos{display:flex;gap:6px;overflow:auto}.attachment-photos img{height:82px;border-radius:8px}
+/* скрываем рекламно-служебные ссылки Яндекса, которые мешают интерфейсу */
+.ymaps-2-1-79-gotoymaps,
+.ymaps-2-1-79-gototech,
+.ymaps-2-1-79-copyright__link,
+.ymaps-2-1-79-map-copyrights-promo,
+.ymaps-2-1-79-copyright_logo_no { display:none !important; }

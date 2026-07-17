@@ -52,6 +52,12 @@ public class PlacemarkModel
 
     public string Notes { get; set; } = string.Empty;
     public string? PhotoPath { get; set; }
+    // Несколько фотографий через ; (до 10). PhotoPath оставлен для совместимости.
+    public string? PhotoPaths { get; set; }
+    public string? CreatedByUserId { get; set; }
+    public string? CreatedByFullName { get; set; }
+    public int Likes { get; set; } = 0;
+    public int Dislikes { get; set; } = 0;
     // Статус проверки: pending (на проверке) | approved (одобрено) | rejected (отклонено)
     public string VerificationStatus { get; set; } = "pending";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

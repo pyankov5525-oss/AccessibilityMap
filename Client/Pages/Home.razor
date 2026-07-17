@@ -8,25 +8,27 @@
 <div class="map-page">
     <div id="map" class="map"></div>
 
-    <div class="map-filters">
-        <div class="filter-title">Фильтр</div>
-        <div class="filter-group">
-            <button class="chip @(currentFilter == "all" ? "chip-active" : "")" @onclick="SetFilterAll">🌐 Все</button>
-            <button class="chip chip-green @(currentFilter == "green" ? "chip-active" : "")" @onclick="SetFilterGreen">🟢 Доступно</button>
-            <button class="chip chip-gold @(currentFilter == "gold" ? "chip-active" : "")" @onclick="SetFilterGold">🟡 Частично</button>
-            <button class="chip chip-red @(currentFilter == "red" ? "chip-active" : "")" @onclick="SetFilterRed">🔴 Недоступно</button>
+    <button class="btn btn-primary filter-fab" @onclick="@(() => showFilters = !showFilters)">🔎 Фильтры</button>
+    @if (showFilters)
+    {
+        <div class="filter-drawer">
+            <div class="detail-head"><h5>Фильтры карты</h5><button class="btn btn-sm btn-secondary" @onclick="@(() => showFilters = false)">×</button></div>
+            <p class="muted">Доступность</p>
+            <div class="filter-group">
+                <button class="chip @(currentFilter == "all" ? "chip-active" : "")" @onclick="SetFilterAll">🌐 Все</button>
+                <button class="chip chip-green @(currentFilter == "green" ? "chip-active" : "")" @onclick="SetFilterGreen">🟢 Доступно</button>
+                <button class="chip chip-gold @(currentFilter == "gold" ? "chip-active" : "")" @onclick="SetFilterGold">🟡 Частично</button>
+                <button class="chip chip-red @(currentFilter == "red" ? "chip-active" : "")" @onclick="SetFilterRed">🔴 Недоступно</button>
+            </div>
+            <p class="muted" style="margin-top:10px;">Категории</p>
+            @foreach (var cat in CategoryOptions)
+            {
+                <label class="chip" style="display:inline-flex;gap:6px;margin:3px;">
+                    <input type="checkbox" checked="@SelectedCategories.Contains(cat.Value)" @onchange="e => ToggleCategory(cat.Value, e.Value)" /> @cat.Label
+                </label>
+            }
         </div>
-        <div class="filter-group">
-            <button class="chip @(categoryFilter == "all" ? "chip-active" : "")" @onclick="SetCategoryAll">🏙️ Все типы</button>
-            <button class="chip @(categoryFilter == "Поликлиника" ? "chip-active" : "")" @onclick="@(() => SetCategory("Поликлиника"))">🏥 Поликлиники</button>
-            <button class="chip @(categoryFilter == "Аптека" ? "chip-active" : "")" @onclick="@(() => SetCategory("Аптека"))">💊 Аптеки</button>
-            <button class="chip @(categoryFilter == "Магазин" ? "chip-active" : "")" @onclick="@(() => SetCategory("Магазин"))">🛒 Магазины</button>
-            <button class="chip @(categoryFilter == "Администрация" ? "chip-active" : "")" @onclick="@(() => SetCategory("Администрация"))">🏛️ Администрация</button>
-            <button class="chip @(categoryFilter == "Культура" ? "chip-active" : "")" @onclick="@(() => SetCategory("Культура"))">🎭 Культура</button>
-            <button class="chip @(categoryFilter == "Образование" ? "chip-active" : "")" @onclick="@(() => SetCategory("Образование"))">🎓 Образование</button>
-            <button class="chip @(categoryFilter == "Другое" ? "chip-active" : "")" @onclick="@(() => SetCategory("Другое"))">📍 Другое</button>
-        </div>
-    </div>
+    }
 
     @if (showCounter)
     {
@@ -92,11 +94,14 @@
 
                 <div class="field">
                     <label class="form-label">Фотография:</label>
-                    <InputFile OnChange="OnFileSelected" accept="image/*" />
-                    @if (!string.IsNullOrEmpty(newPlacemark.PhotoPath))
+                    <InputFile OnChange="OnFileSelected" accept="image/*" multiple />
+                    @if (PhotoList.Count > 0)
                     {
-                        <div class="photo-preview">
-                            <img src="/api/photos/@newPlacemark.PhotoPath" alt="фото объекта" />
+                        <div class="photo-list">
+                            @foreach (var ph in PhotoList)
+                            {
+                                <div class="photo-chip"><img src="/api/photos/@ph" /><button type="button" @onclick="() => RemovePhoto(ph)">×</button></div>
+                            }
                         </div>
                     }
                 </div>
@@ -138,7 +143,9 @@
     private bool showCounter = false;
 
     private string currentFilter = "all";
-    private string categoryFilter = "all";
+    private bool showFilters = false;
+    private HashSet<string> SelectedCategories = new();
+    private readonly (string Value, string Label)[] CategoryOptions = new[] { ("Поликлиника", "🏥 Поликлиники"), ("Аптека", "💊 Аптеки"), ("Магазин", "🛒 Магазины"), ("Администрация", "🏛️ Администрация"), ("Культура", "🎭 Культура"), ("Образование", "🎓 Образование"), ("Другое", "📍 Другое") };
 
     private const long MaxPhotoSize = 5 * 1024 * 1024;
 
@@ -153,12 +160,11 @@
         await JS.InvokeVoidAsync("setFilter", filter);
     }
 
-    private async Task SetCategoryAll() => await SetCategory("all");
-
-    private async Task SetCategory(string category)
+    private async Task ToggleCategory(string category, object? value)
     {
-        categoryFilter = category;
-        await JS.InvokeVoidAsync("setCategoryFilter", category);
+        var selected = value is bool b && b;
+        if (selected) SelectedCategories.Add(category); else SelectedCategories.Remove(category);
+        await JS.InvokeVoidAsync("setCategoryFilter", SelectedCategories.ToArray());
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -332,7 +338,8 @@
                     ScoreParking = placemark.Scores?.Parking ?? 0,
                     ScoreStaff = placemark.Scores?.Staff ?? 0,
                     Notes = placemark.Notes,
-                    PhotoPath = placemark.PhotoPath ?? ""
+                    PhotoPath = placemark.PhotoPath ?? "",
+                    PhotoPaths = placemark.PhotoPaths ?? string.Join(";", placemark.Photos.Select(x => System.IO.Path.GetFileName(x)))
                 };
                 showForm = true;
                 message = "";
@@ -446,32 +453,37 @@
         }
     }
 
+    private List<string> PhotoList => (newPlacemark.PhotoPaths ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries).ToList();
+
+    private void RemovePhoto(string fileName)
+    {
+        var list = PhotoList.Where(x => x != fileName).ToList();
+        newPlacemark.PhotoPaths = string.Join(';', list);
+        newPlacemark.PhotoPath = list.FirstOrDefault() ?? "";
+    }
+
     private async Task OnFileSelected(InputFileChangeEventArgs e)
     {
-        var file = e.File;
-        if (file == null) return;
-
         try
         {
-            await using var ms = new MemoryStream();
-            await file.OpenReadStream(MaxPhotoSize).CopyToAsync(ms);
-
-            var content = new MultipartFormDataContent();
-            content.Add(new ByteArrayContent(ms.ToArray()), "file", file.Name);
-
-            var response = await Http.PostAsync("/api/photos", content);
-            if (response.IsSuccessStatusCode)
+            var list = PhotoList;
+            foreach (var file in e.GetMultipleFiles(10 - list.Count))
             {
-                var result = await response.Content.ReadFromJsonAsync<PhotoUploadResult>();
-                newPlacemark.PhotoPath = result?.FileName ?? "";
-                message = "Фото загружено ✅";
-                isError = false;
+                await using var ms = new MemoryStream();
+                await file.OpenReadStream(MaxPhotoSize).CopyToAsync(ms);
+                var content = new MultipartFormDataContent();
+                content.Add(new ByteArrayContent(ms.ToArray()), "file", file.Name);
+                var response = await Http.PostAsync("/api/photos", content);
+                if (response.IsSuccessStatusCode)
+                {
+                    var result = await response.Content.ReadFromJsonAsync<PhotoUploadResult>();
+                    if (!string.IsNullOrWhiteSpace(result?.FileName)) list.Add(result.FileName);
+                }
             }
-            else
-            {
-                message = "Не удалось загрузить фото";
-                isError = true;
-            }
+            newPlacemark.PhotoPaths = string.Join(';', list.Take(10));
+            newPlacemark.PhotoPath = list.FirstOrDefault() ?? "";
+            message = "Фото загружены ✅";
+            isError = false;
             StateHasChanged();
         }
         catch (Exception ex)
@@ -575,6 +587,11 @@
         public string Notes { get; set; } = "";
         public string? PhotoUrl { get; set; }
         public string? PhotoPath { get; set; }
+        public string? PhotoPaths { get; set; }
+        public List<string> Photos { get; set; } = new();
+        public string? CreatedByFullName { get; set; }
+        public int Likes { get; set; }
+        public int Dislikes { get; set; }
         public string VerificationStatus { get; set; } = "pending";
         public PlacemarkScores? Scores { get; set; }
     }
@@ -606,5 +623,6 @@
         public int ScoreStaff { get; set; }
         public string Notes { get; set; } = "";
         public string PhotoPath { get; set; } = "";
+        public string PhotoPaths { get; set; } = "";
     }
 }

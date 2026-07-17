@@ -1,245 +1,92 @@
 @page "/verify"
 @inject HttpClient Http
-@inject AccessibilityMap.Services.AuthState Auth
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <h3>Проверка меток</h3>
-
-<div class="subtabs">
-    <button class="subtab @(tab == "review" ? "subtab-active" : "")" @onclick="@(() => SetTab("review"))">На проверке</button>
-    <button class="subtab @(tab == "holds" ? "subtab-active" : "")" @onclick="@(() => SetTab("holds"))">На удержании</button>
-</div>
 
 @if (loading)
 {
     <p>Загрузка...</p>
 }
-else if (tab == "review")
+else
 {
     <div class="page">
+        <div class="detail-actions" style="margin-bottom:12px;">
+            <button class="btn btn-sm btn-success" disabled="@(SelectedIds.Count == 0)" @onclick='() => BatchVerify("approved")'>Одобрить выбранные (@SelectedIds.Count)</button>
+            <button class="btn btn-sm btn-danger" disabled="@(SelectedIds.Count == 0)" @onclick="BatchDelete">Удалить выбранные</button>
+        </div>
+
         @if (selected != null)
         {
             <div class="detail-panel">
-                <div class="detail-head">
-                    <h4>@selected.Name</h4>
-                    <button class="btn btn-sm btn-secondary" @onclick="@(() => selected = null)">Закрыть</button>
-                </div>
+                <div class="detail-head"><h4>@selected.Name</h4><button class="btn btn-sm btn-secondary" @onclick="@(() => selected = null)">Закрыть</button></div>
                 <p class="muted">📍 @selected.Address</p>
                 <p class="muted">📂 @selected.Category</p>
+                <p class="muted">👤 Добавил: @(selected.CreatedByFullName ?? "—")</p>
                 <div class="level-badge level-@selected.Level">@selected.LevelText (@selected.TotalScore / 21)</div>
-                @if (!string.IsNullOrEmpty(selected.PhotoUrl))
+                @if (selected.Photos.Count > 0)
                 {
-                    <img class="detail-photo" src="@selected.PhotoUrl" alt="фото объекта" />
+                    <div class="photo-list">@foreach (var ph in selected.Photos) { <img class="detail-photo" style="max-width:120px" src="@ph" /> }</div>
                 }
                 <div class="score-grid">
-                    <div><span>🚪 Вход</span><b>@selected.Scores?.Entrance / 3</b></div>
-                    <div><span>🚶 Ширина дверей</span><b>@selected.Scores?.DoorWidth / 3</b></div>
-                    <div><span>🛤 Внутренние пути</span><b>@selected.Scores?.InternalPath / 3</b></div>
-                    <div><span>🚻 Санитарная зона</span><b>@selected.Scores?.Sanitary / 3</b></div>
-                    <div><span>ℹ️ Информация</span><b>@selected.Scores?.Info / 3</b></div>
-                    <div><span>🅿️ Парковка</span><b>@selected.Scores?.Parking / 3</b></div>
-                    <div><span>👤 Персонал</span><b>@selected.Scores?.Staff / 3</b></div>
+                    <div><span>🚪 Вход</span><b>@selected.Scores?.Entrance / 3</b></div><div><span>↔️ Ширина дверей</span><b>@selected.Scores?.DoorWidth / 3</b></div>
+                    <div><span>🛤 Внутренние пути</span><b>@selected.Scores?.InternalPath / 3</b></div><div><span>🚻 Санитарная зона</span><b>@selected.Scores?.Sanitary / 3</b></div>
+                    <div><span>ℹ️ Информация</span><b>@selected.Scores?.Info / 3</b></div><div><span>🅿️ Парковка</span><b>@selected.Scores?.Parking / 3</b></div>
+                    <div><span>👥 Персонал</span><b>@selected.Scores?.Staff / 3</b></div>
                 </div>
-                @if (!string.IsNullOrEmpty(selected.Notes))
-                {
-                    <p class="muted">📝 @selected.Notes</p>
-                }
+                @if (!string.IsNullOrEmpty(selected.Notes)) { <p class="muted">📝 @selected.Notes</p> }
                 <div class="detail-actions">
-                    <button class="btn btn-sm btn-success" @onclick="@(() => SetStatus(selected.Id, "approved"))">Одобрить</button>
-                    <button class="btn btn-sm btn-danger" @onclick="@(() => SetStatus(selected.Id, "rejected"))">Отклонить</button>
-                    <button class="btn btn-sm btn-secondary" @onclick="@(() => GoToMap(selected.Id))">Перейти к карте →</button>
+                    <button class="btn btn-sm btn-success" @onclick='@(() => SetStatus(selected.Id, "approved"))'>Одобрить</button>
+                    <button class="btn btn-sm btn-danger" @onclick="@(() => DeleteOne(selected.Id))">Удалить</button>
+                    <button class="btn btn-sm btn-secondary" @onclick="@(() => GoToMap(selected.Id))">Карта →</button>
                 </div>
             </div>
         }
 
         <table class="places-table">
-            <thead>
-                <tr><th>Название</th><th>Адрес</th><th>Уровень</th><th>Статус</th><th></th></tr>
-            </thead>
+            <thead><tr><th><input type="checkbox" @onchange="ToggleAll" /></th><th>Название</th><th>Адрес</th><th>Автор</th><th>Уровень</th><th></th></tr></thead>
             <tbody>
             @foreach (var it in items)
             {
                 <tr>
-                    <td>@it.Name</td>
-                    <td>@it.Address</td>
+                    <td><input type="checkbox" checked="@SelectedIds.Contains(it.Id)" @onchange="e => ToggleOne(it.Id, e.Value)" /></td>
+                    <td>@it.Name</td><td>@it.Address</td><td>@(it.CreatedByFullName ?? "—")</td>
                     <td><span class="level-badge level-@it.Level">@it.LevelText</span></td>
-                    <td>@StatusText(it.VerificationStatus)</td>
-                    <td class="row-actions">
-                        <button class="btn btn-sm btn-secondary" @onclick="@(() => selected = it)">Подробнее</button>
-                        <button class="btn btn-sm btn-success" @onclick="@(() => SetStatus(it.Id, "approved"))">Одобрить</button>
-                        <button class="btn btn-sm btn-danger" @onclick="@(() => SetStatus(it.Id, "rejected"))">Отклонить</button>
-                    </td>
+                    <td class="row-actions"><button class="btn btn-sm btn-secondary" @onclick="@(() => selected = it)">Подробнее</button><button class="btn btn-sm btn-success" @onclick='@(() => SetStatus(it.Id, "approved"))'>Одобрить</button><button class="btn btn-sm btn-danger" @onclick="@(() => DeleteOne(it.Id))">Удалить</button></td>
                 </tr>
             }
             </tbody>
         </table>
-        @if (items.Count == 0)
-        {
-            <p class="muted">Меток нет.</p>
-        }
-    </div>
-}
-else
-{
-    <div class="page">
-        <p class="muted">Неодобренные метки хранятся ~сутки, затем удаляются автоматически. Успейте «вернуть» (одобрить/отклонить) при ошибочном нажатии.</p>
-        <table class="places-table">
-            <thead>
-                <tr><th>Название</th><th>Адрес</th><th>Статус</th><th>Осталось</th><th></th></tr>
-            </thead>
-            <tbody>
-            @foreach (var it in holds)
-            {
-                <tr>
-                    <td>@it.Name</td>
-                    <td>@it.Address</td>
-                    <td>@StatusText(it.VerificationStatus)</td>
-                    <td class="muted">@TimeLeft(it.ExpiresAt)</td>
-                    <td class="row-actions">
-                        <button class="btn btn-sm btn-success" @onclick="@(() => SetStatus(it.Id, "approved"))">Одобрить</button>
-                        <button class="btn btn-sm btn-danger" @onclick="@(() => SetStatus(it.Id, "rejected"))">Отклонить</button>
-                        <button class="btn btn-sm btn-secondary" @onclick="@(() => GoToMap(it.Id))">Карта →</button>
-                    </td>
-                </tr>
-            }
-            </tbody>
-        </table>
-        @if (holds.Count == 0)
-        {
-            <p class="muted">Меток на удержании нет.</p>
-        }
+        @if (items.Count == 0) { <p class="muted">Меток на проверке нет.</p> }
     </div>
 }
 
 @code {
     private List<PlacemarkData> items = new();
-    private List<PlacemarkData> holds = new();
     private PlacemarkData? selected;
-    private string tab = "review";
     private bool loading = true;
+    private HashSet<int> SelectedIds = new();
 
-    protected override async Task OnInitializedAsync()
-    {
-        await LoadReview();
-        await LoadHolds();
-        loading = false;
-    }
+    protected override async Task OnInitializedAsync() { await LoadReview(); loading = false; }
 
     private async Task LoadReview()
     {
-        try
-        {
-            var resp = await Http.GetAsync("/api/placemarks");
-            if (!resp.IsSuccessStatusCode)
-            {
-                var err = await resp.Content.ReadAsStringAsync();
-                Console.WriteLine($"API /api/placemarks вернул {resp.StatusCode}. Тело: {err.Substring(0, Math.Min(200, err.Length))}");
-                items = new List<PlacemarkData>();
-                return;
-            }
-            var all = await resp.Content.ReadFromJsonAsync<List<PlacemarkData>>() ?? new List<PlacemarkData>();
-            items = all.Where(x => x.VerificationStatus == "pending").ToList();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine("Verify.Load ошибка: " + ex.Message);
-            items = new List<PlacemarkData>();
-        }
+        var all = await Http.GetFromJsonAsync<List<PlacemarkData>>("/api/placemarks") ?? new();
+        items = all.Where(x => x.VerificationStatus == "pending").ToList();
+        SelectedIds.RemoveWhere(id => !items.Any(x => x.Id == id));
     }
-
-    private async Task LoadHolds()
-    {
-        try
-        {
-            var resp = await Http.GetAsync("/api/placemarks/holds");
-            if (resp.IsSuccessStatusCode)
-            {
-                holds = await resp.Content.ReadFromJsonAsync<List<PlacemarkData>>() ?? new List<PlacemarkData>();
-            }
-            else
-            {
-                holds = new List<PlacemarkData>();
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine("Verify.LoadHolds ошибка: " + ex.Message);
-            holds = new List<PlacemarkData>();
-        }
-    }
-
-    private async Task SetTab(string t)
-    {
-        tab = t;
-        if (t == "holds" && holds.Count == 0 && !loading)
-        {
-            await LoadHolds();
-        }
-        StateHasChanged();
-    }
-
-    private async Task SetStatus(int id, string status)
-    {
-        var resp = await Http.PostAsJsonAsync($"/api/placemarks/{id}/verify", new { Status = status });
-        if (resp.IsSuccessStatusCode)
-        {
-            items.RemoveAll(x => x.Id == id);
-            holds.RemoveAll(x => x.Id == id);
-        }
-        selected = null;
-        await LoadReview();
-        await LoadHolds();
-        StateHasChanged();
-    }
-
-    private void GoToMap(int id)
-    {
-        Navigation.NavigateTo("/?focus=" + id);
-    }
-
-    private string StatusText(string s) => s switch
-    {
-        "approved" => "Одобрено",
-        "rejected" => "Отклонено",
-        _ => "На проверке"
-    };
-
-    private string TimeLeft(DateTime? expires)
-    {
-        if (expires == null) return "—";
-        var left = expires.Value - DateTime.UtcNow;
-        if (left.TotalMinutes <= 0) return "истекает";
-        if (left.TotalHours >= 1) return $"{(int)left.TotalHours} ч";
-        return $"{(int)left.TotalMinutes} мин";
-    }
+    private void ToggleOne(int id, object? value) { if (value is bool b && b) SelectedIds.Add(id); else SelectedIds.Remove(id); }
+    private void ToggleAll(ChangeEventArgs e) { if (e.Value is bool b && b) SelectedIds = items.Select(x => x.Id).ToHashSet(); else SelectedIds.Clear(); }
+    private async Task SetStatus(int id, string status) { await Http.PostAsJsonAsync($"/api/placemarks/{id}/verify", new { Status = status }); selected = null; await LoadReview(); }
+    private async Task BatchVerify(string status) { await Http.PostAsJsonAsync("/api/placemarks/batch-verify", new { Ids = SelectedIds.ToList(), Status = status }); SelectedIds.Clear(); await LoadReview(); }
+    private async Task DeleteOne(int id) { if (await JS.InvokeAsync<bool>("confirm", "Удалить метку?")) { await Http.DeleteAsync($"/api/placemarks/{id}"); selected = null; await LoadReview(); } }
+    private async Task BatchDelete() { if (await JS.InvokeAsync<bool>("confirm", $"Удалить выбранные метки ({SelectedIds.Count})?")) { await Http.PostAsJsonAsync("/api/placemarks/batch-delete", new { Ids = SelectedIds.ToList() }); SelectedIds.Clear(); await LoadReview(); } }
+    private void GoToMap(int id) => Navigation.NavigateTo("/?focus=" + id);
 
     public class PlacemarkData
     {
-        public int Id { get; set; }
-        public string Name { get; set; } = "";
-        public string Address { get; set; } = "";
-        public string Category { get; set; } = "";
-        public string Level { get; set; } = "";
-        public string LevelText { get; set; } = "";
-        public int TotalScore { get; set; }
-        public string VerificationStatus { get; set; } = "pending";
-        public string? PhotoUrl { get; set; }
-        public string? PhotoPath { get; set; }
-        public string Notes { get; set; } = "";
-        public double Latitude { get; set; }
-        public double Longitude { get; set; }
-        public DateTime? ExpiresAt { get; set; }
-        public PlacemarkScores? Scores { get; set; }
+        public int Id { get; set; } public string Name { get; set; } = ""; public string Address { get; set; } = ""; public string Category { get; set; } = ""; public string Level { get; set; } = ""; public string LevelText { get; set; } = ""; public int TotalScore { get; set; } public string VerificationStatus { get; set; } = "pending"; public string Notes { get; set; } = ""; public List<string> Photos { get; set; } = new(); public string? CreatedByFullName { get; set; } public PlacemarkScores? Scores { get; set; }
     }
-
-    public class PlacemarkScores
-    {
-        public int Entrance { get; set; }
-        public int DoorWidth { get; set; }
-        public int InternalPath { get; set; }
-        public int Sanitary { get; set; }
-        public int Info { get; set; }
-        public int Parking { get; set; }
-        public int Staff { get; set; }
-    }
+    public class PlacemarkScores { public int Entrance { get; set; } public int DoorWidth { get; set; } public int InternalPath { get; set; } public int Sanitary { get; set; } public int Info { get; set; } public int Parking { get; set; } public int Staff { get; set; } }
 }

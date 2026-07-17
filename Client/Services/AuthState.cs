@@ -11,11 +11,12 @@ public class AuthState
     public string Token { get; private set; } = "";
     public string UserName { get; private set; } = "";
     public string Role { get; private set; } = "";
+    public bool ProfileComplete { get; private set; } = true;
     public bool IsAuthenticated => !string.IsNullOrEmpty(Token);
+    public bool CanWork => !IsAuthenticated || ProfileComplete;
 
     public event Action? OnChange;
 
-    // Восстановить сессию из localStorage (чтобы при перезагрузке страницы не выкидывало)
     public async Task RestoreAsync()
     {
         try
@@ -29,6 +30,7 @@ public class AuthState
                     Token = data.Token;
                     UserName = data.UserName;
                     Role = data.Role;
+                    ProfileComplete = data.ProfileComplete;
                     OnChange?.Invoke();
                 }
             }
@@ -36,18 +38,28 @@ public class AuthState
         catch { }
     }
 
-    public async Task SetAsync(string token, string userName, string role)
+    public async Task SetAsync(string token, string userName, string role, bool profileComplete = true)
     {
         Token = token;
         UserName = userName;
         Role = role;
+        ProfileComplete = profileComplete;
         try
         {
-            var json = JsonSerializer.Serialize(new AuthData { Token = token, UserName = userName, Role = role });
+            var json = JsonSerializer.Serialize(new AuthData { Token = token, UserName = userName, Role = role, ProfileComplete = profileComplete });
             await _js.InvokeVoidAsync("localStorage.setItem", "am_auth", json);
         }
         catch { }
         OnChange?.Invoke();
+    }
+
+    public async Task SetProfileCompleteAsync(bool complete)
+    {
+        ProfileComplete = complete;
+        if (IsAuthenticated)
+            await SetAsync(Token, UserName, Role, complete);
+        else
+            OnChange?.Invoke();
     }
 
     public async Task ClearAsync()
@@ -55,6 +67,7 @@ public class AuthState
         Token = "";
         UserName = "";
         Role = "";
+        ProfileComplete = true;
         try { await _js.InvokeVoidAsync("localStorage.removeItem", "am_auth"); } catch { }
         OnChange?.Invoke();
     }
@@ -64,5 +77,6 @@ public class AuthState
         public string Token { get; set; } = "";
         public string UserName { get; set; } = "";
         public string Role { get; set; } = "";
+        public bool ProfileComplete { get; set; } = true;
     }
 }

@@ -155,6 +155,7 @@ else
         {
             message = "Сохранено ✅";
             isError = false;
+            await Auth.SetProfileCompleteAsync(!string.IsNullOrWhiteSpace(editFullName) && editDob != null);
             await Load();
         }
         else

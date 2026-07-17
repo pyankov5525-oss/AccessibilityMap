@@ -41,7 +41,7 @@
         var placemarkObjects = {};
         var dotNetRef;
         var currentFilter = 'all';
-        var currentCategoryFilter = 'all';
+        var currentCategoryFilter = [];
         var markerClusterer = null;
 
         function setDotNetRef(ref) {
@@ -128,8 +128,8 @@
             updateCounter();
         }
 
-        function setCategoryFilter(category) {
-            currentCategoryFilter = category || 'all';
+        function setCategoryFilter(categories) {
+            currentCategoryFilter = Array.isArray(categories) ? categories : [];
             showPlacemarks();
             updateCounter();
         }
@@ -299,12 +299,12 @@
             if (verifyMode) {
                 list = list.filter(function (p) { return p.verificationStatus && p.verificationStatus !== 'approved'; });
             } else {
-                list = list.filter(function (p) { return !p.verificationStatus || p.verificationStatus === 'approved'; });
+                list = list.filter(function (p) { return !p.verificationStatus || p.verificationStatus === 'approved' || (canAddPlacemark && p.verificationStatus === 'pending'); });
                 if (currentFilter !== 'all') {
                     list = list.filter(function (p) { return p.level === currentFilter; });
                 }
-                if (currentCategoryFilter !== 'all') {
-                    list = list.filter(function (p) { return (p.category || '') === currentCategoryFilter; });
+                if (currentCategoryFilter.length > 0) {
+                    list = list.filter(function (p) { return currentCategoryFilter.indexOf(p.category || '') >= 0; });
                 }
             }
             return list;
@@ -359,6 +359,9 @@
                     '</div>';
             }
             var photo = p.photoUrl ? '<img class="map-info-photo" src="' + escapeHtml(p.photoUrl) + '" alt="фото объекта" />' : '';
+            var photosButton = (p.photos && p.photos.length) ? '<button class="map-info-btn edit" onclick="showPhotoGallery(' + p.id + ')">📷 Фото (' + p.photos.length + ')</button>' : '';
+            var likes = '<div class="likes-row"><button onclick="votePlacemark(' + p.id + ',1)">👍 ' + (p.likes || 0) + '</button><button onclick="votePlacemark(' + p.id + ',-1)">👎 ' + (p.dislikes || 0) + '</button></div>';
+            var author = p.createdByFullName ? '<div class="map-info-notes">👤 Добавил: ' + escapeHtml(p.createdByFullName) + '</div>' : '';
             var actions = canManagePlacemarks
                 ? '<div class="map-info-actions"><button onclick="editPlacemark(' + p.id + ')" class="map-info-btn edit">✏️ Изменить</button>' +
                   '<button onclick="deletePlacemark(' + p.id + ')" class="map-info-btn delete">🗑 Удалить</button></div>'
@@ -370,8 +373,7 @@
                 '<div class="map-info-level" style="background:' + getLevelColor(p.level) + '">' +
                 escapeHtml(p.levelText) + ' (' + p.totalScore + ' / 21)' +
                 '</div>' + photo + scores +
-                (p.notes ? '<div class="map-info-notes">📝 ' + escapeHtml(p.notes) + '</div>' : '') +
-                actions;
+                (p.notes ? '<div class="map-info-notes">📝 ' + escapeHtml(p.notes) + '</div>' : '') + author + photosButton + likes + actions;
         }
 
         function ensurePlacemarkPanel() {
@@ -476,6 +478,25 @@
                 hidePlacemarkPanel();
                 dotNetRef.invokeMethodAsync('EditPlacemark', id).catch(function(){});
             }
+        }
+
+
+        function showPhotoGallery(id) {
+            var p = (placemarksData || []).find(function(x){ return x.id === id; });
+            if (!p || !p.photos || !p.photos.length) return;
+            var html = '<button class="map-info-close" onclick="hidePlacemarkPanel()">×</button><h4>📷 Фотографии</h4>' +
+                p.photos.map(function(src){ return '<img class="map-info-photo" src="' + escapeHtml(src) + '" />'; }).join('') +
+                '<button class="map-info-btn edit" onclick="openBalloon(' + id + ')">← Назад к метке</button>';
+            showPlacemarkPanel(html);
+        }
+
+        function votePlacemark(id, value) {
+            fetch('/api/placemarks/' + id + '/vote', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: value })
+            }).then(function(r){ return r.json(); }).then(function(v){
+                var p = (placemarksData || []).find(function(x){ return x.id === id; });
+                if (p) { p.likes = v.likes; p.dislikes = v.dislikes; openBalloon(id); }
+            }).catch(function(){});
         }
 
         function showSuggestions(items) {

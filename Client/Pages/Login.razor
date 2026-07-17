@@ -67,7 +67,7 @@
                 var result = await response.Content.ReadFromJsonAsync<LoginResult>();
                 if (result != null)
                 {
-                    await Auth.SetAsync(result.Token, result.UserName, result.Role);
+                    await Auth.SetAsync(result.Token, result.UserName, result.Role, result.ProfileComplete);
                     Nav.NavigateTo("");
                 }
             }
@@ -96,6 +96,7 @@
         public string Token { get; set; } = "";
         public string UserName { get; set; } = "";
         public string Role { get; set; } = "";
+        public bool ProfileComplete { get; set; } = true;
     }
 
     public class ErrorResult

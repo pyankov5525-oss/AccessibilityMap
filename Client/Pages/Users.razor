@@ -56,7 +56,7 @@ else
             </div>
 
             <p class="muted">
-                ФИО и дата рождения обязательны. Без них аккаунт не будет создан.
+                Для ручного профиля ФИО и дата рождения обязательны. Авто-аккаунт можно выдать сразу, но пользователь не сможет работать, пока сам не заполнит профиль.
             </p>
 
             <div class="field">
@@ -69,15 +69,18 @@ else
                 </select>
             </div>
 
-            <div class="field">
-                <label class="form-label">ФИО</label>
-                <input @bind="createFullName" @bind:event="oninput" class="form-control" placeholder="Иванов Иван Иванович" />
-            </div>
+            @if (createMode == "manual")
+            {
+                <div class="field">
+                    <label class="form-label">ФИО</label>
+                    <input @bind="createFullName" @bind:event="oninput" class="form-control" placeholder="Иванов Иван Иванович" />
+                </div>
 
-            <div class="field">
-                <label class="form-label">Дата рождения</label>
-                <input type="date" @bind="createDateOfBirth" class="form-control" />
-            </div>
+                <div class="field">
+                    <label class="form-label">Дата рождения</label>
+                    <input type="date" @bind="createDateOfBirth" class="form-control" />
+                </div>
+            }
 
             @if (createMode == "manual")
             {
@@ -279,11 +282,11 @@ else if (Auth.Role == "Developer" || Auth.Role == "Manager")
     private async Task CreateAccount()
     {
         message = "";
-        if (string.IsNullOrWhiteSpace(createFullName)) { message = "Укажите ФИО"; return; }
-        if (createDateOfBirth == null) { message = "Укажите дату рождения"; return; }
         if (!AllowedCreateRoles.Contains(createRole)) { message = "Недоступная роль"; return; }
+        if (createMode == "manual" && string.IsNullOrWhiteSpace(createFullName)) { message = "Укажите ФИО"; return; }
+        if (createMode == "manual" && createDateOfBirth == null) { message = "Укажите дату рождения"; return; }
 
-        var dob = createDateOfBirth.Value.ToString("yyyy-MM-dd");
+        var dob = createDateOfBirth?.ToString("yyyy-MM-dd") ?? "";
         HttpResponseMessage res;
         if (createMode == "manual")
         {

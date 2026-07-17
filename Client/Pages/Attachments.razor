@@ -1,0 +1,43 @@
+@page "/attachments"
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<h3>Вложения</h3>
+<p class="muted">Все фотографии, прикреплённые к меткам. Доступно управляющему и разработчику.</p>
+
+@if (loading)
+{
+    <p>Загрузка...</p>
+}
+else
+{
+    <div class="attachments-grid">
+    @foreach (var a in items)
+    {
+        <div class="attachment-card">
+            <h5>@a.Name</h5>
+            <p class="muted">@a.Address</p>
+            <p class="muted">Статус: @a.VerificationStatus</p>
+            <div class="attachment-photos">
+                @foreach (var ph in a.Photos)
+                {
+                    <a href="@ph" target="_blank"><img src="@ph" /></a>
+                }
+            </div>
+            <button class="btn btn-sm btn-secondary" style="margin-top:8px" @onclick='() => Nav.NavigateTo("/?focus=" + a.Id)'>Перейти к метке</button>
+        </div>
+    }
+    </div>
+    @if (items.Count == 0) { <p class="muted">Вложений пока нет.</p> }
+}
+
+@code {
+    private bool loading = true;
+    private List<AttachmentRow> items = new();
+    protected override async Task OnInitializedAsync()
+    {
+        try { items = await Http.GetFromJsonAsync<List<AttachmentRow>>("/api/placemarks/attachments") ?? new(); } catch { items = new(); }
+        loading = false;
+    }
+    public class AttachmentRow { public int Id { get; set; } public string Name { get; set; } = ""; public string Address { get; set; } = ""; public string VerificationStatus { get; set; } = ""; public List<string> Photos { get; set; } = new(); }
+}
