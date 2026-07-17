@@ -349,14 +349,22 @@ public class PlacemarksController : ControllerBase
         await using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
 
-        _db.Photos.Add(new PhotoModel
+        try
         {
-            FileName = fileName,
-            ContentType = GetContentType(fileName),
-            Data = ms.ToArray(),
-            UploadedAt = DateTime.UtcNow
-        });
-        await _db.SaveChangesAsync();
+            _db.Photos.Add(new PhotoModel
+            {
+                FileName = fileName,
+                ContentType = GetContentType(fileName),
+                Data = ms.ToArray(),
+                UploadedAt = DateTime.UtcNow
+            });
+            await _db.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Photo upload failed");
+            return StatusCode(500, new { error = "Не удалось сохранить фото в базу данных" });
+        }
 
         return Ok(new { fileName });
     }
@@ -453,11 +461,37 @@ public class PlacemarksController : ControllerBase
     {
         var p = await _db.Placemarks.FindAsync(id);
         if (p == null) return NotFound();
-        if (model.Value > 0) p.Likes++;
-        else if (model.Value < 0) p.Dislikes++;
-        else return BadRequest(new { error = "value должен быть 1 или -1" });
+
+        var value = model.Value > 0 ? 1 : model.Value < 0 ? -1 : 0;
+        if (value == 0) return BadRequest(new { error = "value должен быть 1 или -1" });
+
+        var voterKey = GetVoterKey();
+        var existing = await _db.PlacemarkVotes.FirstOrDefaultAsync(v => v.PlacemarkId == id && v.VoterKey == voterKey);
+
+        if (existing == null)
+        {
+            _db.PlacemarkVotes.Add(new PlacemarkVoteModel
+            {
+                PlacemarkId = id,
+                VoterKey = voterKey,
+                Value = value,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            });
+            if (value > 0) p.Likes++; else p.Dislikes++;
+        }
+        else if (existing.Value != value)
+        {
+            if (existing.Value > 0 && p.Likes > 0) p.Likes--;
+            if (existing.Value < 0 && p.Dislikes > 0) p.Dislikes--;
+            existing.Value = value;
+            existing.UpdatedAt = DateTime.UtcNow;
+            if (value > 0) p.Likes++; else p.Dislikes++;
+        }
+        // Если голос такой же — ничего не меняем, чтобы нельзя было накручивать.
+
         await _db.SaveChangesAsync();
-        return Ok(new { p.Likes, p.Dislikes });
+        return Ok(new { p.Likes, p.Dislikes, userVote = existing?.Value ?? value });
     }
 
     [HttpGet("attachments")]
@@ -473,6 +507,20 @@ public class PlacemarksController : ControllerBase
             p.VerificationStatus,
             Photos = GetPhotos(p).Select(x => "/api/photos/" + x).ToList()
         }).ToList());
+    }
+
+
+    private string GetVoterKey()
+    {
+        if (User.Identity?.IsAuthenticated == true)
+        {
+            var id = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (!string.IsNullOrWhiteSpace(id)) return "user:" + id;
+        }
+
+        var ip = HttpContext?.Connection?.RemoteIpAddress?.ToString() ?? "unknown";
+        var ua = Request.Headers.UserAgent.ToString();
+        return "anon:" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(ip + "|" + ua)));
     }
 
     public class VerifyModel

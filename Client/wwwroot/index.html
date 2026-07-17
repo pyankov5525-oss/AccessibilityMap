@@ -153,14 +153,10 @@
         }
 
         function setCategoryFilter(categories) {
-            if (Array.isArray(categories)) {
-                currentCategoryFilter = categories.map(function(x){ return String(x).trim().toLowerCase(); });
-            } else if (categories && typeof categories.length === 'number') {
-                currentCategoryFilter = Array.prototype.slice.call(categories).map(function(x){ return String(x).trim().toLowerCase(); });
-            } else if (categories && typeof categories === 'object') {
-                currentCategoryFilter = Object.keys(categories).map(function(k){ return categories[k]; }).filter(Boolean).map(function(x){ return String(x).trim().toLowerCase(); });
-            } else if (typeof categories === 'string' && categories.length > 0) {
-                currentCategoryFilter = [String(categories).trim().toLowerCase()];
+            if (typeof categories === 'string') {
+                currentCategoryFilter = categories.split('|').map(function(x){ return x.trim().toLowerCase(); }).filter(Boolean);
+            } else if (Array.isArray(categories)) {
+                currentCategoryFilter = categories.map(function(x){ return String(x).trim().toLowerCase(); }).filter(Boolean);
             } else {
                 currentCategoryFilter = [];
             }

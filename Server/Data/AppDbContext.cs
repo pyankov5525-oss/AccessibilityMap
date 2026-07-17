@@ -12,6 +12,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<PlacemarkModel> Placemarks { get; set; }
     public DbSet<ActivityLog> ActivityLogs { get; set; }
     public DbSet<PhotoModel> Photos { get; set; }
+    public DbSet<PlacemarkVoteModel> PlacemarkVotes { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -35,6 +36,13 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(e => e.FileName).IsRequired();
             entity.Property(e => e.ContentType).IsRequired();
             entity.Property(e => e.Data).IsRequired();
+        });
+
+        modelBuilder.Entity<PlacemarkVoteModel>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.PlacemarkId, e.VoterKey }).IsUnique();
+            entity.Property(e => e.VoterKey).IsRequired();
         });
     }
 }

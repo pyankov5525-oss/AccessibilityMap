@@ -182,7 +182,7 @@
     private async Task ApplyFilters()
     {
         SelectedCategories = DraftCategories.ToHashSet();
-        await JS.InvokeVoidAsync("setCategoryFilter", SelectedCategories.ToArray());
+        await JS.InvokeVoidAsync("setCategoryFilter", string.Join("|", SelectedCategories));
         showFilters = false;
     }
 
@@ -192,7 +192,7 @@
         SelectedCategories.Clear();
         DraftCategories.Clear();
         await JS.InvokeVoidAsync("setFilter", "all");
-        await JS.InvokeVoidAsync("setCategoryFilter", Array.Empty<string>());
+        await JS.InvokeVoidAsync("setCategoryFilter", "");
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
