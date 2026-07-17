@@ -151,7 +151,7 @@ else if (Auth.Role == "Developer" || Auth.Role == "Manager")
                         @if (CanChangeRole(u))
                         {
                             <select class="form-control form-control-sm" @onchange="e => ChangeRoleSafe(u.Id, e.Value)">
-                                @foreach (var r in new[] { "Manager", "Volunteer" })
+                                @foreach (var r in RoleOptionsForUser(u))
                                 {
                                     @if (r == u.Role)
                                     {
@@ -174,7 +174,7 @@ else if (Auth.Role == "Developer" || Auth.Role == "Manager")
                         <button class="btn btn-sm btn-info" @onclick="() => ViewProfile(u.Id)">Профиль</button>
                     </td>
                     <td class="row-actions">
-                        <button class="btn btn-sm btn-danger" disabled="@(isSelf || u.Role == "Developer")" @onclick="() => DeleteUser(u.Id)">Удалить</button>
+                        <button class="btn btn-sm btn-danger" disabled="@(!CanDeleteUser(u, isSelf))" @onclick="() => DeleteUser(u.Id)">Удалить</button>
                     </td>
                 </tr>
             }
@@ -205,7 +205,7 @@ else if (Auth.Role == "Developer" || Auth.Role == "Manager")
     private string manualPassword = "";
 
     private IEnumerable<string> AllowedCreateRoles => Auth.Role == "Developer"
-        ? new[] { "Manager", "Volunteer" }
+        ? new[] { "Developer", "Manager", "Volunteer" }
         : new[] { "Volunteer" };
 
     private List<UserRow> VisibleUsers => Auth.Role == "Manager"
@@ -352,7 +352,19 @@ else if (Auth.Role == "Developer" || Auth.Role == "Manager")
         StateHasChanged();
     }
 
-    private bool CanChangeRole(UserRow u) => Auth.Role == "Developer" && u.Role != "Developer" && u.UserName != Auth.UserName;
+    private bool CanChangeRole(UserRow u) => Auth.Role == "Developer" && u.UserName != Auth.UserName;
+
+    private IEnumerable<string> RoleOptionsForUser(UserRow u) => Auth.Role == "Developer"
+        ? new[] { "Developer", "Manager", "Volunteer" }
+        : new[] { "Volunteer" };
+
+    private bool CanDeleteUser(UserRow u, bool isSelf)
+    {
+        if (isSelf) return false;
+        if (Auth.Role == "Manager") return u.Role == "Volunteer";
+        if (Auth.Role == "Developer") return u.Role != "Developer" || CountRole("Developer") > 1;
+        return false;
+    }
 
     private void ViewProfile(string id) => Nav.NavigateTo($"/profile?id={id}");
 

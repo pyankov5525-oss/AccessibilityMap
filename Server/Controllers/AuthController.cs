@@ -119,8 +119,8 @@ public class AuthController : ControllerBase
     [Authorize(Roles = "Developer")]
     public async Task<IActionResult> CreateManagerOrDev([FromBody] CreateModel model)
     {
-        if (model.Role != "Manager" && model.Role != "Volunteer")
-            return BadRequest(new { error = "Можно создать только управляющего или волонтёра. Роль разработчика зарезервирована за основным аккаунтом." });
+        if (model.Role != "Developer" && model.Role != "Manager" && model.Role != "Volunteer")
+            return BadRequest(new { error = "Можно создать только разработчика, управляющего или волонтёра" });
         return await CreateUser(model.Role, model.FullName, model.DateOfBirth);
     }
 
@@ -192,15 +192,23 @@ public class AuthController : ControllerBase
     [Authorize(Roles = "Developer")]
     public async Task<IActionResult> ChangeRole(string id, [FromBody] RoleModel model)
     {
-        if (model.Role != "Manager" && model.Role != "Volunteer")
-            return BadRequest(new { error = "Недопустимая роль. Роль разработчика нельзя назначать через интерфейс." });
+        if (model.Role != "Developer" && model.Role != "Manager" && model.Role != "Volunteer")
+            return BadRequest(new { error = "Недопустимая роль" });
 
         var user = await _userManager.FindByIdAsync(id);
         if (user == null) return NotFound();
 
+        var self = await _userManager.GetUserAsync(User);
+        if (self != null && self.Id == user.Id)
+            return BadRequest(new { error = "Нельзя менять собственную роль" });
+
         var current = await _userManager.GetRolesAsync(user);
-        if (current.Contains("Developer"))
-            return BadRequest(new { error = "Нельзя менять роль разработчика." });
+        if (current.Contains("Developer") && model.Role != "Developer")
+        {
+            var devs = await _userManager.GetUsersInRoleAsync("Developer");
+            if (devs.Count <= 1)
+                return BadRequest(new { error = "Нельзя убрать роль у последнего разработчика" });
+        }
 
         foreach (var r in current)
             await _userManager.RemoveFromRoleAsync(user, r);
@@ -233,10 +241,15 @@ public class AuthController : ControllerBase
         if (user == null) return NotFound();
 
         var roles = await _userManager.GetRolesAsync(user);
-        if (roles.Contains("Developer"))
-            return BadRequest(new { error = "Нельзя удалить разработчика" });
-
         var currentRole = await GetCurrentRoleAsync();
+        if (roles.Contains("Developer"))
+        {
+            if (currentRole != "Developer") return Forbid();
+            var devs = await _userManager.GetUsersInRoleAsync("Developer");
+            if (devs.Count <= 1)
+                return BadRequest(new { error = "Нельзя удалить последнего разработчика" });
+        }
+
         if (currentRole == "Manager" && !roles.Contains("Volunteer"))
             return Forbid();
 
@@ -421,14 +434,12 @@ public class AuthController : ControllerBase
         var selfRoles = self == null ? new List<string>() : await _userManager.GetRolesAsync(self);
         bool allowed;
         if (selfRoles.Contains("Developer"))
-            allowed = model.Role == "Manager" || model.Role == "Volunteer"; // разработчик создаёт управляющих и волонтёров
+            allowed = model.Role == "Developer" || model.Role == "Manager" || model.Role == "Volunteer"; // разработчик создаёт любые роли
         else if (selfRoles.Contains("Manager"))
             allowed = model.Role == "Volunteer"; // управляющий — только волонтёра
         else
             allowed = false;
         if (!allowed) return Forbid();
-        if (model.Role == "Developer")
-            return BadRequest(new { error = "Роль разработчика зарезервирована за основным аккаунтом." });
 
         if (await _userManager.FindByNameAsync(model.Login) != null)
             return BadRequest(new { error = "Такой логин уже занят" });
@@ -527,7 +538,7 @@ public class AuthController : ControllerBase
         var currentRole = await GetCurrentRoleAsync();
         var targetRoles = await _userManager.GetRolesAsync(target);
         if (currentRole == "Developer")
-            return !targetRoles.Contains("Developer");
+            return true;
         if (currentRole == "Manager")
             return targetRoles.Contains("Volunteer");
         return false;
