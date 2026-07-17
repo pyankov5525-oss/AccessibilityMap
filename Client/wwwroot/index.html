@@ -127,6 +127,23 @@
                     setTimeout(hideSuggestions, 200);
                 }
             });
+
+            document.addEventListener('click', function (e) {
+                var voteBtn = e.target.closest ? e.target.closest('[data-vote-id]') : null;
+                if (voteBtn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    votePlacemark(parseInt(voteBtn.getAttribute('data-vote-id')), parseInt(voteBtn.getAttribute('data-vote-value')));
+                    return;
+                }
+                var galleryBtn = e.target.closest ? e.target.closest('[data-gallery-id]') : null;
+                if (galleryBtn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    showPhotoGallery(parseInt(galleryBtn.getAttribute('data-gallery-id')));
+                    return;
+                }
+            });
         }
 
         function setFilter(filter) {
@@ -137,17 +154,21 @@
 
         function setCategoryFilter(categories) {
             if (Array.isArray(categories)) {
-                currentCategoryFilter = categories;
+                currentCategoryFilter = categories.map(function(x){ return String(x).trim().toLowerCase(); });
             } else if (categories && typeof categories.length === 'number') {
-                currentCategoryFilter = Array.prototype.slice.call(categories);
+                currentCategoryFilter = Array.prototype.slice.call(categories).map(function(x){ return String(x).trim().toLowerCase(); });
+            } else if (categories && typeof categories === 'object') {
+                currentCategoryFilter = Object.keys(categories).map(function(k){ return categories[k]; }).filter(Boolean).map(function(x){ return String(x).trim().toLowerCase(); });
             } else if (typeof categories === 'string' && categories.length > 0) {
-                currentCategoryFilter = [categories];
+                currentCategoryFilter = [String(categories).trim().toLowerCase()];
             } else {
                 currentCategoryFilter = [];
             }
             showPlacemarks();
             updateCounter();
         }
+        window.setCategoryFilter = setCategoryFilter;
+        window.setFilter = setFilter;
 
         function updatePlacemarks(placemarks) {
             placemarksData = placemarks || [];
@@ -320,7 +341,7 @@
                     list = list.filter(function (p) { return p.verificationStatus === 'pending' || p.level === currentFilter; });
                 }
                 if (currentCategoryFilter.length > 0) {
-                    list = list.filter(function (p) { return currentCategoryFilter.indexOf(p.category || '') >= 0; });
+                    list = list.filter(function (p) { return currentCategoryFilter.indexOf(String(p.category || '').trim().toLowerCase()) >= 0; });
                 }
             }
             return list;
@@ -377,8 +398,8 @@
                     '</div>';
             }
             var photo = p.photoUrl ? '<img class="map-info-photo" src="' + escapeHtml(p.photoUrl) + '" alt="фото объекта" />' : '';
-            var photosButton = (p.photos && p.photos.length) ? '<button class="map-info-btn edit" onclick="showPhotoGallery(' + p.id + ')">📷 Фото (' + p.photos.length + ')</button>' : '';
-            var likes = '<div class="likes-row"><button onclick="votePlacemark(' + p.id + ',1)">👍 ' + (p.likes || 0) + '</button><button onclick="votePlacemark(' + p.id + ',-1)">👎 ' + (p.dislikes || 0) + '</button></div>';
+            var photosButton = (p.photos && p.photos.length) ? '<button type="button" class="map-info-btn edit" data-gallery-id="' + p.id + '">📷 Фото (' + p.photos.length + ')</button>' : '';
+            var likes = '<div class="likes-row"><button type="button" data-vote-id="' + p.id + '" data-vote-value="1">👍 ' + (p.likes || 0) + '</button><button type="button" data-vote-id="' + p.id + '" data-vote-value="-1">👎 ' + (p.dislikes || 0) + '</button></div>';
             var author = p.createdByFullName ? '<div class="map-info-notes">👤 Добавил: ' + escapeHtml(p.createdByFullName) + '</div>' : '';
             var actions = canManagePlacemarks
                 ? '<div class="map-info-actions"><button onclick="editPlacemark(' + p.id + ')" class="map-info-btn edit">✏️ Изменить</button>' +

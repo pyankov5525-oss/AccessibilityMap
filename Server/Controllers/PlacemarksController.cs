@@ -333,6 +333,11 @@ public class PlacemarksController : ControllerBase
             return BadRequest(new { error = "Файл не выбран" });
         }
 
+        if (file.Length > 5 * 1024 * 1024)
+        {
+            return BadRequest(new { error = "Фото слишком большое (максимум 5 МБ)" });
+        }
+
         var allowed = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
         var ext = Path.GetExtension(file.FileName);
         if (!allowed.Contains(ext, StringComparer.OrdinalIgnoreCase))

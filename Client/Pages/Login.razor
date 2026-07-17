@@ -13,16 +13,16 @@
         </div>
         <div class="field">
             <label class="form-label">Пароль:</label>
-            <div class="password-row">
+            <div class="password-field">
                 <input type="@(showPassword ? "text" : "password")" @bind="password" @bind:event="oninput" class="form-control" autocomplete="current-password" />
-                <button type="button" class="btn btn-secondary password-toggle" @onclick="@(() => showPassword = !showPassword)">@(showPassword ? "🙈" : "👁️")</button>
+                <button type="button" class="password-eye" @onclick="@(() => showPassword = !showPassword)" title="Показать/скрыть пароль">@(showPassword ? "🙈" : "👁️")</button>
             </div>
         </div>
         <div class="field">
             <label class="form-label">Проверка (капча): <b>@captchaQuestion</b></label>
             <input @bind="captchaAnswer" @bind:event="oninput" class="form-control" placeholder="Введите ответ" />
         </div>
-        <button class="btn btn-primary" disabled="@isLoggingIn" @onclick="DoLogin">@(isLoggingIn ? "Входим..." : "Войти")</button>
+        <button class="btn btn-primary" disabled="@(isLoggingIn || string.IsNullOrWhiteSpace(captchaToken))" @onclick="DoLogin">@(isLoggingIn ? "Входим..." : "Войти")</button>
         @if (!string.IsNullOrEmpty(error))
         {
             <div class="alert alert-danger">@error</div>

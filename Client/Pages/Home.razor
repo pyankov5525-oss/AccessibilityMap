@@ -496,7 +496,16 @@
         try
         {
             var list = PhotoList;
-            foreach (var file in e.GetMultipleFiles(10 - list.Count))
+            var selected = e.GetMultipleFiles(10).ToList();
+            if (list.Count + selected.Count > 10)
+            {
+                message = "Можно добавить максимум 10 фотографий.";
+                isError = true;
+                return;
+            }
+
+            var uploaded = 0;
+            foreach (var file in selected)
             {
                 await using var ms = new MemoryStream();
                 await file.OpenReadStream(MaxPhotoSize).CopyToAsync(ms);
@@ -506,12 +515,23 @@
                 if (response.IsSuccessStatusCode)
                 {
                     var result = await response.Content.ReadFromJsonAsync<PhotoUploadResult>();
-                    if (!string.IsNullOrWhiteSpace(result?.FileName)) list.Add(result.FileName);
+                    if (!string.IsNullOrWhiteSpace(result?.FileName))
+                    {
+                        list.Add(result.FileName);
+                        uploaded++;
+                    }
+                }
+                else
+                {
+                    var err = await response.Content.ReadAsStringAsync();
+                    message = string.IsNullOrWhiteSpace(err) ? "Не удалось загрузить фото" : err;
+                    isError = true;
+                    return;
                 }
             }
-            newPlacemark.PhotoPaths = string.Join(';', list.Take(10));
+            newPlacemark.PhotoPaths = string.Join(';', list.Distinct().Take(10));
             newPlacemark.PhotoPath = list.FirstOrDefault() ?? "";
-            message = "Фото загружены ✅";
+            message = uploaded > 0 ? $"Фото загружены: {uploaded} ✅" : "Фото не выбраны";
             isError = false;
             StateHasChanged();
         }

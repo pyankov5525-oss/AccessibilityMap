@@ -949,3 +949,92 @@ body.theme-light .map-info-btn {
   .app-main { padding: 4px; }
   .map-page { height: calc(100vh - 124px); min-height: 520px; }
 }
+
+/* === Финальные правки интерфейса === */
+.topbar { padding: 4px 10px !important; gap: 8px !important; }
+.app-main { padding: 0 6px 4px !important; }
+.map-page { height: calc(100dvh - 50px) !important; }
+.map { border-radius: 6px !important; }
+
+/* Переключатель темы под размер переключателя шрифта */
+.theme-switch, .font-switch { min-height: 34px; padding: 3px !important; }
+.theme-btn, .font-btn {
+  height: 30px !important;
+  min-width: 58px !important;
+  padding: 4px 10px !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.theme-btn { font-size: 18px !important; }
+.font-btn { font-size: 13px !important; }
+.ui-control-label { font-size: 11px !important; color: var(--text) !important; }
+
+/* Мягкие границы вместо грубой чёрной обводки */
+body.theme-light { --border: #cbd5e1; --text: #0f172a; --text-dim: #1f2937; }
+body.theme-light .topbar,
+body.theme-light .form-card,
+body.theme-light .places-table,
+body.theme-light .detail-panel,
+body.theme-light .login-card,
+body.theme-light .filter-drawer,
+body.theme-light .map-info-panel,
+body.theme-light .about-card,
+body.theme-light .attachment-card,
+body.theme-light .modal-card-custom,
+body.theme-light .chip,
+body.theme-light .subtab,
+body.theme-light .score-btn,
+body.theme-light .stat,
+body.theme-light .btn-secondary,
+body.theme-light .form-control,
+body.theme-light .theme-switch,
+body.theme-light .font-switch,
+body.theme-light .photo-chip,
+body.theme-light .likes-row button {
+  border-color: #cbd5e1 !important;
+}
+body.theme-light, body.theme-light p, body.theme-light td, body.theme-light th,
+body.theme-light label, body.theme-light span, body.theme-light div,
+body.theme-light .nav-link, body.theme-light .brand, body.theme-light .map-info-panel {
+  color: #0f172a !important;
+}
+body.theme-light .muted, body.theme-light .form-label, body.theme-light .map-info-notes,
+body.theme-light .map-info-scores, body.theme-light .about-card p, body.theme-light .about-card ul {
+  color: #1f2937 !important;
+  opacity: 1 !important;
+}
+
+/* Маленький глаз внутри поля пароля */
+.password-field { position: relative; display: block; }
+.password-field .form-control { padding-right: 46px; }
+.password-eye {
+  position: absolute;
+  right: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px !important;
+  height: 30px !important;
+  min-width: 34px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 17px;
+  line-height: 1;
+}
+.login-card .password-eye { width: 34px !important; }
+.login-card .btn.password-toggle { width: auto !important; }
+
+/* Кликабельность панели метки и лайков */
+.map-info-panel { pointer-events: auto !important; }
+.map-info-panel button, .likes-row button, .map-info-btn { pointer-events: auto !important; cursor: pointer !important; }
+.likes-row button:hover, .map-info-btn:hover, .password-eye:hover { filter: brightness(0.96); }
+
+@media (max-width:760px){
+  .topbar { padding: 4px 6px !important; }
+  .app-main { padding: 0 4px 3px !important; }
+  .map-page { height: calc(100dvh - 112px) !important; min-height: 500px !important; }
+  .theme-btn, .font-btn { min-width: 50px !important; }
+}
