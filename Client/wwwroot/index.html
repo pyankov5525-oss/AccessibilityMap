@@ -36,14 +36,42 @@
         var verifyMode = false;
         var canVerify = false;
         var canManagePlacemarks = false;
+        var canAddPlacemark = false;
         var placemarksData = [];
         var placemarkObjects = {};
         var dotNetRef;
         var currentFilter = 'all';
+        var currentCategoryFilter = 'all';
+        var markerClusterer = null;
 
         function setDotNetRef(ref) {
             dotNetRef = ref;
         }
+
+        function getUiPreference(key, fallback) {
+            try { return localStorage.getItem(key) || fallback; } catch (e) { return fallback; }
+        }
+
+        function applyUiPrefs() {
+            var theme = getUiPreference('am_theme', 'dark');
+            var font = getUiPreference('am_font', 'medium');
+            document.body.classList.toggle('theme-light', theme === 'light');
+            document.body.classList.toggle('theme-dark', theme !== 'light');
+            document.body.classList.remove('font-small', 'font-medium', 'font-large');
+            document.body.classList.add('font-' + font);
+        }
+
+        function setThemePreference(theme) {
+            try { localStorage.setItem('am_theme', theme); } catch (e) {}
+            applyUiPrefs();
+        }
+
+        function setFontPreference(font) {
+            try { localStorage.setItem('am_font', font); } catch (e) {}
+            applyUiPrefs();
+        }
+
+        applyUiPrefs();
 
         var searchSuggestTimer = null;
         var searchHandlersReady = false;
@@ -100,6 +128,12 @@
             updateCounter();
         }
 
+        function setCategoryFilter(category) {
+            currentCategoryFilter = category || 'all';
+            showPlacemarks();
+            updateCounter();
+        }
+
         function updatePlacemarks(placemarks) {
             placemarksData = placemarks || [];
             if (typeof ymaps === 'undefined' || typeof ymaps.ready !== 'function') {
@@ -143,7 +177,7 @@
                     setTimeout(function () { restoreMapMode(); renderModeSwitcher(); }, 100);
 
                     map.events.add('click', function (e) {
-                        if (!accessibilityMode || verifyMode || !dotNetRef) return;
+                        if (!accessibilityMode || verifyMode || !dotNetRef || !canAddPlacemark) return;
                         var target = e.get('target');
                         if (target && target.geometry && target.properties && target.properties.get && target.properties.get('name')) {
                             // Клик по организации Яндекса (магазин, аптека и т.п.)
@@ -193,6 +227,10 @@
 
         function setCanManagePlacemarks(v) {
             canManagePlacemarks = !!v;
+        }
+
+        function setCanAddPlacemark(v) {
+            canAddPlacemark = !!v;
         }
 
         function setMapMode(mode) {
@@ -250,19 +288,14 @@
                 showPlacemarks();
                 updateCounter();
                 map.setCenter([p.latitude, p.longitude], 17, { duration: 300 });
-                var pm = placemarkObjects[id];
-                if (pm) pm.balloon.open();
+                openBalloon(id);
             }
             tryFocus();
         }
 
-        function updateCounter() {
-            if (!dotNetRef) return;
-            if (!accessibilityMode) {
-                dotNetRef.invokeMethodAsync('UpdateCounter', 0, 0, 0, 0).catch(function(){});
-                return;
-            }
-            var list = placemarksData;
+        function getVisiblePlacemarks() {
+            var list = placemarksData || [];
+            if (!accessibilityMode) return [];
             if (verifyMode) {
                 list = list.filter(function (p) { return p.verificationStatus && p.verificationStatus !== 'approved'; });
             } else {
@@ -270,6 +303,19 @@
                 if (currentFilter !== 'all') {
                     list = list.filter(function (p) { return p.level === currentFilter; });
                 }
+                if (currentCategoryFilter !== 'all') {
+                    list = list.filter(function (p) { return (p.category || '') === currentCategoryFilter; });
+                }
+            }
+            return list;
+        }
+
+        function updateCounter() {
+            if (!dotNetRef) return;
+            var list = getVisiblePlacemarks();
+            if (!accessibilityMode) {
+                dotNetRef.invokeMethodAsync('UpdateCounter', 0, 0, 0, 0).catch(function(){});
+                return;
             }
             var total = list.length;
             var green = list.filter(function (p) { return p.level === 'green'; }).length;
@@ -278,75 +324,119 @@
             dotNetRef.invokeMethodAsync('UpdateCounter', total, green, gold, red).catch(function(){});
         }
 
+        function escapeHtml(v) {
+            return (v || '').toString()
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function categoryEmoji(category) {
+            if (category === 'Поликлиника') return '🏥';
+            if (category === 'Аптека') return '💊';
+            if (category === 'Магазин') return '🛒';
+            if (category === 'Администрация') return '🏛️';
+            if (category === 'Культура') return '🎭';
+            if (category === 'Образование') return '🎓';
+            return '📍';
+        }
+
+        function buildPlacemarkContent(p) {
+            var scores = '';
+            if (p.scores) {
+                scores =
+                    '<div class="map-info-scores">' +
+                    '<b>Критерии:</b>' +
+                    '<div>🚪 Вход <b>' + p.scores.entrance + '/3</b></div>' +
+                    '<div>↔️ Ширина дверей <b>' + p.scores.doorWidth + '/3</b></div>' +
+                    '<div>🛤️ Внутренние пути <b>' + p.scores.internalPath + '/3</b></div>' +
+                    '<div>🚻 Санитарная зона <b>' + p.scores.sanitary + '/3</b></div>' +
+                    '<div>ℹ️ Информация <b>' + p.scores.info + '/3</b></div>' +
+                    '<div>🅿️ Парковка <b>' + p.scores.parking + '/3</b></div>' +
+                    '<div>👥 Персонал <b>' + p.scores.staff + '/3</b></div>' +
+                    '</div>';
+            }
+            var photo = p.photoUrl ? '<img class="map-info-photo" src="' + escapeHtml(p.photoUrl) + '" alt="фото объекта" />' : '';
+            var actions = canManagePlacemarks
+                ? '<div class="map-info-actions"><button onclick="editPlacemark(' + p.id + ')" class="map-info-btn edit">✏️ Изменить</button>' +
+                  '<button onclick="deletePlacemark(' + p.id + ')" class="map-info-btn delete">🗑 Удалить</button></div>'
+                : '';
+            return '<button class="map-info-close" onclick="hidePlacemarkPanel()">×</button>' +
+                '<h4>' + categoryEmoji(p.category) + ' ' + escapeHtml(p.name) + '</h4>' +
+                '<p class="muted">📍 ' + escapeHtml(p.address || 'Адрес не указан') + '</p>' +
+                '<p class="muted">📂 ' + escapeHtml(p.category || 'Без категории') + '</p>' +
+                '<div class="map-info-level" style="background:' + getLevelColor(p.level) + '">' +
+                escapeHtml(p.levelText) + ' (' + p.totalScore + ' / 21)' +
+                '</div>' + photo + scores +
+                (p.notes ? '<div class="map-info-notes">📝 ' + escapeHtml(p.notes) + '</div>' : '') +
+                actions;
+        }
+
+        function ensurePlacemarkPanel() {
+            var panel = document.getElementById('mapInfoPanel');
+            if (!panel) {
+                panel = document.createElement('div');
+                panel.id = 'mapInfoPanel';
+                panel.className = 'map-info-panel';
+                document.body.appendChild(panel);
+            }
+            return panel;
+        }
+
+        function showPlacemarkPanel(content) {
+            var panel = ensurePlacemarkPanel();
+            panel.innerHTML = content;
+            panel.style.display = 'block';
+        }
+
+        function hidePlacemarkPanel() {
+            var panel = document.getElementById('mapInfoPanel');
+            if (panel) panel.style.display = 'none';
+        }
+
         function showPlacemarks() {
             if (!map) return;
             map.geoObjects.removeAll();
             placemarkObjects = {};
-            // п.3: метки показываем только в «режиме доступности»
-            if (!accessibilityMode) return;
-            if (placemarksData.length > 0) {
-                var filtered = placemarksData;
-                if (verifyMode) {
-                    // режим проверки — ТОЛЬКО неодобренные (серые) метки
-                    filtered = placemarksData.filter(function (p) { return p.verificationStatus && p.verificationStatus !== 'approved'; });
-                } else {
-                    // обычный режим — ТОЛЬКО одобренные; серые видны лишь в режиме проверки
-                    filtered = placemarksData.filter(function (p) { return !p.verificationStatus || p.verificationStatus === 'approved'; });
-                    if (currentFilter !== 'all') {
-                        filtered = filtered.filter(function (p) { return p.level === currentFilter; });
-                    }
-                }
-                filtered.forEach(function (p) {
-                    var isPending = p.verificationStatus && p.verificationStatus !== 'approved';
-                    var markerColor = isPending ? '#9E9E9E' : getLevelColor(p.level);
-                    var markerIcon = isPending ? 'grey' : (p.level || 'red');
-                    var scores = '';
-                    if (p.scores) {
-                        scores =
-                            '<div style="font-size:11px; color:#555; margin:8px 0; line-height:1.6;">' +
-                            '<b>Критерии:</b><br/>' +
-                            '🚪 Вход: ' + p.scores.entrance + '/3<br/>' +
-                            '🚶 Ширина дверей: ' + p.scores.doorWidth + '/3<br/>' +
-                            '🛤 Внутренние пути: ' + p.scores.internalPath + '/3<br/>' +
-                            '🚻 Санитарная зона: ' + p.scores.sanitary + '/3<br/>' +
-                            'ℹ️ Информация: ' + p.scores.info + '/3<br/>' +
-                            '🅿️ Парковка: ' + p.scores.parking + '/3<br/>' +
-                            '👤 Персонал: ' + p.scores.staff + '/3<br/>' +
-                            '</div>';
-                    }
+            markerClusterer = null;
+            if (!accessibilityMode) { hidePlacemarkPanel(); return; }
 
-                    var photo = (p.photoUrl ? '<img src="' + p.photoUrl + '" style="width:100%; max-width:230px; border-radius:6px; margin:6px 0;" />' : '');
-                    var actions = canManagePlacemarks
-                        ? '<button onclick="editPlacemark(' + p.id + ')" style="padding:4px 10px; background:#2196F3; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px; margin-right:4px;">✏️ Изменить</button>' +
-                          '<button onclick="deletePlacemark(' + p.id + ')" style="padding:4px 10px; background:#F44336; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px;">🗑 Удалить</button>'
-                        : '';
+            var filtered = getVisiblePlacemarks();
+            if (!filtered.length) return;
 
-                    var content =
-                        '<div style="font-family:sans-serif; max-width:250px;">' +
-                        '<h4 style="margin:0 0 6px 0; color:#333;">' + p.name + '</h4>' +
-                        '<p style="margin:0 0 4px 0; color:#666; font-size:12px;">📍 ' + (p.address || 'Адрес не указан') + '</p>' +
-                        '<p style="margin:0 0 8px 0; color:#666; font-size:12px;">📂 ' + (p.category || 'Без категории') + '</p>' +
-                        '<div style="background:' + getLevelColor(p.level) + '; color:#fff; padding:6px 10px; border-radius:4px; text-align:center; font-weight:bold; margin-bottom:8px;">' +
-                        p.levelText + ' (' + p.totalScore + ' / 21 баллов)' +
-                        '</div>' +
-                        photo +
-                        scores +
-                        (p.notes ? '<div style="font-size:11px; color:#888; margin-top:8px; font-style:italic;">📝 ' + p.notes + '</div>' : '') +
-                        actions +
-                        '</div>';
+            markerClusterer = new ymaps.Clusterer({
+                preset: 'islands#blueClusterIcons',
+                groupByCoordinates: false,
+                clusterDisableClickZoom: false,
+                clusterOpenBalloonOnClick: true,
+                gridSize: 64
+            });
 
-                    var pm = new ymaps.Placemark([p.latitude, p.longitude], {
-                        balloonContent: content
-                    }, {
-                        iconLayout: 'default#image',
-                        iconImageHref: 'https://cdn.jsdelivr.net/gh/pointhi/leaflet-color-markers@master/img/marker-icon-2x-' + markerIcon + '.png',
-                        iconImageSize: [25, 41],
-                        iconImageOffset: [-12, -41]
-                    });
-                    placemarkObjects[p.id] = pm;
-                    map.geoObjects.add(pm);
+            var geoObjects = [];
+            filtered.forEach(function (p) {
+                var isPending = p.verificationStatus && p.verificationStatus !== 'approved';
+                var markerIcon = isPending ? 'grey' : (p.level || 'red');
+                var content = buildPlacemarkContent(p);
+                var pm = new ymaps.Placemark([p.latitude, p.longitude], {
+                    hintContent: categoryEmoji(p.category) + ' ' + (p.name || ''),
+                    panelContent: content
+                }, {
+                    iconLayout: 'default#image',
+                    iconImageHref: 'https://cdn.jsdelivr.net/gh/pointhi/leaflet-color-markers@master/img/marker-icon-2x-' + markerIcon + '.png',
+                    iconImageSize: [22, 36],
+                    iconImageOffset: [-11, -36],
+                    balloonPanelMaxMapArea: 0
                 });
-            }
+                pm.events.add('click', function () {
+                    showPlacemarkPanel(content);
+                });
+                placemarkObjects[p.id] = pm;
+                geoObjects.push(pm);
+            });
+            markerClusterer.add(geoObjects);
+            map.geoObjects.add(markerClusterer);
         }
 
         function getLevelColor(level) {
@@ -357,14 +447,15 @@
 
         function openBalloon(id) {
             var pm = placemarkObjects[id];
-            if (pm) {
-                pm.balloon.open();
+            if (pm && pm.properties) {
+                showPlacemarkPanel(pm.properties.get('panelContent') || '');
             }
         }
 
         function moveMapTo(lat, lon) {
             if (map) {
-                map.balloon.close();
+                try { map.balloon.close(); } catch (e) {}
+                hidePlacemarkPanel();
                 map.setCenter([lat, lon], 16, { duration: 300 });
             }
         }
@@ -372,7 +463,7 @@
         function deletePlacemark(id) {
             if (confirm('Удалить этот объект?')) {
                 var pm = placemarkObjects[id];
-                if (pm && pm.balloon) pm.balloon.close();
+                hidePlacemarkPanel();
                 if (dotNetRef) {
                     dotNetRef.invokeMethodAsync('DeletePlacemark', id).catch(function(){});
                 }
@@ -382,7 +473,7 @@
         function editPlacemark(id) {
             if (dotNetRef) {
                 var pm = placemarkObjects[id];
-                if (pm && pm.balloon) pm.balloon.close();
+                hidePlacemarkPanel();
                 dotNetRef.invokeMethodAsync('EditPlacemark', id).catch(function(){});
             }
         }

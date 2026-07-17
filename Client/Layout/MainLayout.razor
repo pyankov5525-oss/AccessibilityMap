@@ -2,26 +2,16 @@
 @inject AccessibilityMap.Services.AuthState Auth
 @implements IDisposable
 
-@if (Auth.IsAuthenticated)
-{
-    <div class="app-shell">
-        <NavMenu />
-        <main class="app-main">
-            @Body
-        </main>
-    </div>
-}
-else
-{
-    <Login />
-}
+<div class="app-shell">
+    <NavMenu />
+    <main class="app-main">
+        @Body
+    </main>
+</div>
 
 @code {
     protected override async Task OnInitializedAsync()
     {
-        // Подписываемся ДО восстановления сессии, чтобы при появлении токена
-        // из localStorage шелл сразу перерисовался (иначе после обновления
-        // страницы пользователь «выкидывался» на форму входа).
         Auth.OnChange += StateHasChanged;
         await Auth.RestoreAsync();
     }

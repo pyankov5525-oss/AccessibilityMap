@@ -1,17 +1,20 @@
 @inject AccessibilityMap.Services.AuthState Auth
 @inject HttpClient Http
 @inject NavigationManager Nav
+@inject IJSRuntime JS
+@implements IAsyncDisposable
 
 <div class="topbar">
     <a class="brand" href="">♿ Карта доступности</a>
     <nav class="nav-links">
         <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Карта</NavLink>
-    <NavLink class="nav-link" href="places">Список</NavLink>
-    @if (Auth.IsAuthenticated)
-    {
-        <NavLink class="nav-link" href="profile">Профиль</NavLink>
-    }
-    @if (Auth.Role == "Manager" || Auth.Role == "Developer")
+        <NavLink class="nav-link" href="places">Список</NavLink>
+        <NavLink class="nav-link" href="about">О проекте</NavLink>
+        @if (Auth.IsAuthenticated)
+        {
+            <NavLink class="nav-link" href="profile">Профиль</NavLink>
+        }
+        @if (Auth.Role == "Manager" || Auth.Role == "Developer")
         {
             <NavLink class="nav-link" href="verify">Проверка</NavLink>
             <NavLink class="nav-link" href="users">Пользователи</NavLink>
@@ -20,14 +23,56 @@
         {
             <NavLink class="nav-link" href="logs">Журнал</NavLink>
         }
+        @if (!Auth.IsAuthenticated)
+        {
+            <NavLink class="nav-link nav-login" href="login">Вход</NavLink>
+        }
     </nav>
+
+    <div class="ui-controls">
+        <select class="form-control form-control-sm ui-select" value="@theme" @onchange="ChangeTheme" title="Тема">
+            <option value="dark">Тёмная</option>
+            <option value="light">Светлая</option>
+        </select>
+        <select class="form-control form-control-sm ui-select" value="@fontSize" @onchange="ChangeFont" title="Размер шрифта">
+            <option value="small">Шрифт S</option>
+            <option value="medium">Шрифт M</option>
+            <option value="large">Шрифт L</option>
+        </select>
+    </div>
+
     <div class="user-box">
-        <span class="muted">@Auth.UserName · @RoleRu</span>
-        <button class="btn btn-sm btn-secondary" @onclick="Logout">Выйти</button>
+        @if (Auth.IsAuthenticated)
+        {
+            <span class="muted">@Auth.UserName · @RoleRu</span>
+            <button class="btn btn-sm btn-secondary" @onclick="Logout">Выйти</button>
+        }
+        else
+        {
+            <span class="muted guest-label">Гость</span>
+        }
     </div>
 </div>
 
 @code {
+    private string theme = "dark";
+    private string fontSize = "medium";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                theme = await JS.InvokeAsync<string>("getUiPreference", "am_theme", "dark");
+                fontSize = await JS.InvokeAsync<string>("getUiPreference", "am_font", "medium");
+                await JS.InvokeVoidAsync("applyUiPrefs");
+                StateHasChanged();
+            }
+            catch { }
+        }
+    }
+
     private string RoleRu => Auth.Role switch
     {
         "Developer" => "Разработчик",
@@ -36,9 +81,27 @@
         _ => Auth.Role
     };
 
+    private async Task ChangeTheme(ChangeEventArgs e)
+    {
+        theme = e.Value?.ToString() ?? "dark";
+        await JS.InvokeVoidAsync("setThemePreference", theme);
+    }
+
+    private async Task ChangeFont(ChangeEventArgs e)
+    {
+        fontSize = e.Value?.ToString() ?? "medium";
+        await JS.InvokeVoidAsync("setFontPreference", fontSize);
+    }
+
     private async Task Logout()
     {
         try { await Http.PostAsync("/api/auth/logout", null); } catch { }
         await Auth.ClearAsync();
+        Nav.NavigateTo("");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await Task.CompletedTask;
     }
 }

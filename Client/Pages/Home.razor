@@ -8,12 +8,24 @@
 <div class="map-page">
     <div id="map" class="map"></div>
 
-    @* Фильтры — накладываются поверх карты (по центру сверху) *@
     <div class="map-filters">
-        <button class="chip @(currentFilter == "all" ? "chip-active" : "")" @onclick="SetFilterAll">Все</button>
-        <button class="chip chip-green @(currentFilter == "green" ? "chip-active" : "")" @onclick="SetFilterGreen">🟢 Доступно</button>
-        <button class="chip chip-gold @(currentFilter == "gold" ? "chip-active" : "")" @onclick="SetFilterGold">🟡 Частично</button>
-        <button class="chip chip-red @(currentFilter == "red" ? "chip-active" : "")" @onclick="SetFilterRed">🔴 Недоступно</button>
+        <div class="filter-title">Фильтр</div>
+        <div class="filter-group">
+            <button class="chip @(currentFilter == "all" ? "chip-active" : "")" @onclick="SetFilterAll">🌐 Все</button>
+            <button class="chip chip-green @(currentFilter == "green" ? "chip-active" : "")" @onclick="SetFilterGreen">🟢 Доступно</button>
+            <button class="chip chip-gold @(currentFilter == "gold" ? "chip-active" : "")" @onclick="SetFilterGold">🟡 Частично</button>
+            <button class="chip chip-red @(currentFilter == "red" ? "chip-active" : "")" @onclick="SetFilterRed">🔴 Недоступно</button>
+        </div>
+        <div class="filter-group">
+            <button class="chip @(categoryFilter == "all" ? "chip-active" : "")" @onclick="SetCategoryAll">🏙️ Все типы</button>
+            <button class="chip @(categoryFilter == "Поликлиника" ? "chip-active" : "")" @onclick="@(() => SetCategory("Поликлиника"))">🏥 Поликлиники</button>
+            <button class="chip @(categoryFilter == "Аптека" ? "chip-active" : "")" @onclick="@(() => SetCategory("Аптека"))">💊 Аптеки</button>
+            <button class="chip @(categoryFilter == "Магазин" ? "chip-active" : "")" @onclick="@(() => SetCategory("Магазин"))">🛒 Магазины</button>
+            <button class="chip @(categoryFilter == "Администрация" ? "chip-active" : "")" @onclick="@(() => SetCategory("Администрация"))">🏛️ Администрация</button>
+            <button class="chip @(categoryFilter == "Культура" ? "chip-active" : "")" @onclick="@(() => SetCategory("Культура"))">🎭 Культура</button>
+            <button class="chip @(categoryFilter == "Образование" ? "chip-active" : "")" @onclick="@(() => SetCategory("Образование"))">🎓 Образование</button>
+            <button class="chip @(categoryFilter == "Другое" ? "chip-active" : "")" @onclick="@(() => SetCategory("Другое"))">📍 Другое</button>
+        </div>
     </div>
 
     @if (showCounter)
@@ -32,7 +44,7 @@
     }
     else if (accessibilityMode)
     {
-        <div class="map-banner">♿ Режим доступности включён — показаны одобренные метки. Кликните по карте, чтобы добавить объект.</div>
+        <div class="map-banner">♿ Режим доступности включён — показаны одобренные метки. @(Auth.IsAuthenticated ? "Кликните по карте, чтобы добавить объект." : "Войдите, чтобы добавлять объекты.")</div>
     }
     else
     {
@@ -126,6 +138,7 @@
     private bool showCounter = false;
 
     private string currentFilter = "all";
+    private string categoryFilter = "all";
 
     private const long MaxPhotoSize = 5 * 1024 * 1024;
 
@@ -140,6 +153,14 @@
         await JS.InvokeVoidAsync("setFilter", filter);
     }
 
+    private async Task SetCategoryAll() => await SetCategory("all");
+
+    private async Task SetCategory(string category)
+    {
+        categoryFilter = category;
+        await JS.InvokeVoidAsync("setCategoryFilter", category);
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -150,6 +171,7 @@
                 await JS.InvokeVoidAsync("setDotNetRef", dotNetRef);
                 await JS.InvokeVoidAsync("setCanVerify", Auth.Role == "Developer" || Auth.Role == "Manager");
                 await JS.InvokeVoidAsync("setCanManagePlacemarks", Auth.Role == "Developer" || Auth.Role == "Manager");
+                await JS.InvokeVoidAsync("setCanAddPlacemark", Auth.IsAuthenticated);
                 await LoadPlacemarks();
 
                 var query = new Uri(Navigation.Uri).Query;

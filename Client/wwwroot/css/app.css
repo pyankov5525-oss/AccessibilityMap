@@ -505,3 +505,147 @@ textarea.form-control:disabled {
   padding: 18px;
   box-shadow: 0 18px 60px rgba(0,0,0,.45);
 }
+
+/* ===== Светлая тема и доступность интерфейса ===== */
+body.theme-light {
+  --bg: #f3f6fb;
+  --bg-elev: #ffffff;
+  --bg-input: #eef2f7;
+  --border: #cfd8e3;
+  --text: #172033;
+  --text-dim: #596579;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --green: #16a34a;
+  --gold: #ca8a04;
+  --red: #dc2626;
+}
+body.font-small { font-size: 14px; }
+body.font-medium { font-size: 16px; }
+body.font-large { font-size: 18px; }
+body.font-large .btn,
+body.font-large .form-control,
+body.font-large .chip,
+body.font-large .nav-link { font-size: 1rem; }
+
+.ui-controls { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+.ui-select { width:auto; min-width:92px; padding:4px 8px; }
+.nav-login { border:1px solid var(--accent); color:var(--text) !important; }
+.guest-label { white-space:nowrap; }
+
+/* вход теперь отдельная страница, а не блокировка всего сайта */
+.login-page {
+  min-height: calc(100vh - 120px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.login-overlay { display:none; }
+
+/* фильтры карты справа снизу */
+.map-filters {
+  top: auto;
+  left: auto;
+  right: 12px;
+  bottom: 12px;
+  transform: none;
+  width: 310px;
+  max-width: calc(100vw - 24px);
+  max-height: 44vh;
+  overflow: auto;
+  justify-content: flex-start;
+  align-items: stretch;
+  flex-direction: column;
+  background: rgba(22, 28, 36, .94);
+}
+body.theme-light .map-filters { background: rgba(255,255,255,.94); }
+.filter-title { color: var(--text); font-weight: 700; font-size: 13px; padding: 0 4px 2px; }
+.filter-group { display:flex; gap:6px; flex-wrap:wrap; }
+.filter-group + .filter-group { padding-top:6px; border-top:1px solid var(--border); }
+.map-filters .chip { padding:5px 9px; font-size:12px; }
+
+/* панель информации о метке в углу вместо большого балуна по центру */
+.map-info-panel {
+  display:none;
+  position: fixed;
+  z-index: 1500;
+  top: 86px;
+  left: 16px;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 120px);
+  overflow: auto;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--bg-elev);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 40px rgba(0,0,0,.38);
+}
+.map-info-panel h4 { padding-right:28px; }
+.map-info-close {
+  position:absolute; right:10px; top:8px;
+  width:26px; height:26px; border-radius:50%;
+  border:1px solid var(--border); background:var(--bg-input); color:var(--text);
+  cursor:pointer; font-weight:800;
+}
+.map-info-level { color:#fff; padding:7px 10px; border-radius:8px; text-align:center; font-weight:700; margin:8px 0; }
+.map-info-photo { width:100%; border-radius:8px; margin:8px 0; border:1px solid var(--border); }
+.map-info-scores { display:grid; gap:4px; font-size:13px; color:var(--text-dim); margin:8px 0; }
+.map-info-scores div { display:flex; justify-content:space-between; border-bottom:1px dashed var(--border); padding-bottom:3px; }
+.map-info-scores b { color:var(--text); }
+.map-info-notes { color:var(--text-dim); font-size:13px; margin:8px 0; }
+.map-info-actions { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+.map-info-btn { border:0; border-radius:8px; padding:6px 10px; color:#fff; cursor:pointer; font-weight:700; font-size:12px; }
+.map-info-btn.edit { background:#2563eb; }
+.map-info-btn.delete { background:#dc2626; }
+
+/* компактнее форма постановки метки и оценки */
+.map-form-overlay { width: 360px; padding: 10px; }
+.map-form-overlay .form-card { padding: 14px; }
+.score-selector { gap:4px; }
+.score-btn { padding:5px 0; border-radius:7px; font-size:13px; min-height:30px; }
+.map-form-overlay .field { margin-bottom:8px; }
+.map-form-overlay .form-label { font-size:12px; }
+.criteria-title { margin:10px 0 6px; }
+
+/* страница О проекте */
+.about-page { max-width: 1180px; }
+.about-lead { max-width: 850px; margin-bottom: 18px; }
+.about-grid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:14px; }
+.about-card { background:var(--bg-elev); border:1px solid var(--border); border-radius:14px; padding:18px; }
+.about-card ul { margin:8px 0 0; padding-left:20px; color:var(--text-dim); }
+.about-card p { color:var(--text-dim); }
+
+/* мобильная адаптация */
+@media (max-width: 760px) {
+  .topbar { gap:10px; padding:10px; align-items:flex-start; }
+  .brand { width:100%; }
+  .nav-links { width:100%; overflow-x:auto; flex-wrap:nowrap; padding-bottom:4px; }
+  .nav-link { white-space:nowrap; padding:6px 10px; }
+  .ui-controls { width:100%; }
+  .ui-select { flex:1; min-width:130px; }
+  .user-box { width:100%; justify-content:space-between; }
+  .app-main { padding:8px; }
+  .map-page { height: calc(100vh - 150px); min-height: 560px; }
+  .map { border-radius:10px; }
+  .map-filters {
+    right: 8px;
+    bottom: 8px;
+    width: min(330px, calc(100vw - 16px));
+    max-height: 34vh;
+    padding: 6px;
+  }
+  .map-stats { left:8px; bottom: calc(34vh + 20px); flex-wrap:wrap; max-width:calc(100vw - 16px); }
+  .stat { min-width:54px; padding:5px 8px; }
+  .map-banner, .map-hint { bottom: calc(34vh + 88px); font-size:12px; padding:8px 10px; }
+  .map-form-overlay { width:100%; max-width:100%; padding:8px; }
+  .map-form-overlay .form-card { height:auto; max-height:calc(100vh - 170px); }
+  .map-info-panel { left:8px; top:154px; width:calc(100vw - 16px); max-height:42vh; }
+  .places-table { display:block; overflow-x:auto; white-space:nowrap; }
+  .about-grid { grid-template-columns:1fr; }
+  .login-page { min-height: calc(100vh - 170px); padding:12px; }
+  .login-card { width:100%; }
+  .score-btn { min-height:28px; font-size:12px; }
+}
