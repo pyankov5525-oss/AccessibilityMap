@@ -715,3 +715,150 @@ body.theme-light .form-control {
 body.theme-light .map-hint { background: rgba(255,255,255,.94); color:#596579; }
 body.theme-light .map-banner { background: rgba(37,99,235,.92); }
 @media (max-width:760px){ .ui-controls{margin-left:0}.theme-btn{font-size:20px;min-width:44px}.font-btn{padding:7px 10px} }
+
+/* === Контрастность светлой темы и доступность шрифта === */
+body.theme-light {
+  --bg: #ffffff;
+  --bg-elev: #ffffff;
+  --bg-input: #ffffff;
+  --border: #000000;
+  --text: #000000;
+  --text-dim: #111111;
+}
+body.theme-light,
+body.theme-light p,
+body.theme-light td,
+body.theme-light th,
+body.theme-light label,
+body.theme-light span,
+body.theme-light div,
+body.theme-light .muted,
+body.theme-light .form-label,
+body.theme-light .nav-link,
+body.theme-light .brand,
+body.theme-light .map-info-panel,
+body.theme-light .map-info-notes,
+body.theme-light .map-info-scores,
+body.theme-light .about-card p,
+body.theme-light .about-card ul,
+body.theme-light .places-table td,
+body.theme-light .places-table th {
+  color: #000 !important;
+}
+body.theme-light .topbar,
+body.theme-light .form-card,
+body.theme-light .places-table,
+body.theme-light .detail-panel,
+body.theme-light .login-card,
+body.theme-light .filter-drawer,
+body.theme-light .map-info-panel,
+body.theme-light .about-card,
+body.theme-light .attachment-card,
+body.theme-light .modal-card-custom,
+body.theme-light .chip,
+body.theme-light .subtab,
+body.theme-light .score-btn,
+body.theme-light .stat,
+body.theme-light .btn-secondary,
+body.theme-light .form-control,
+body.theme-light .theme-switch,
+body.theme-light .font-switch,
+body.theme-light .photo-chip,
+body.theme-light .likes-row button {
+  border-color: #000 !important;
+}
+body.theme-light .form-control,
+body.theme-light .form-control:focus,
+body.theme-light .form-control:disabled,
+body.theme-light .form-control[readonly] {
+  background: #fff !important;
+  color: #000 !important;
+  -webkit-text-fill-color: #000 !important;
+}
+body.theme-light .chip,
+body.theme-light .subtab,
+body.theme-light .score-btn,
+body.theme-light .stat,
+body.theme-light .btn-secondary,
+body.theme-light .theme-switch,
+body.theme-light .font-switch,
+body.theme-light .likes-row button {
+  background: #fff !important;
+  color: #000 !important;
+}
+body.theme-light .chip-active,
+body.theme-light .subtab-active,
+body.theme-light .score-btn-active,
+body.theme-light .theme-btn.active,
+body.theme-light .font-btn.active {
+  background: var(--accent) !important;
+  color: #fff !important;
+}
+body.theme-light .btn-primary,
+body.theme-light .btn-success,
+body.theme-light .btn-danger,
+body.theme-light .map-banner,
+body.theme-light .level-badge,
+body.theme-light .map-info-level,
+body.theme-light .map-info-btn {
+  color: #fff !important;
+}
+
+/* Видимые подписи переключателей */
+.ui-controls {
+  align-items: flex-start;
+  gap: 12px;
+}
+.ui-control-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.ui-control-label {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+/* Более заметная разница размеров шрифта */
+body.font-small { font-size: 13px; }
+body.font-medium { font-size: 17px; }
+body.font-large { font-size: 21px; }
+body.font-small .map-info-panel { font-size: 13px; }
+body.font-medium .map-info-panel { font-size: 17px; }
+body.font-large .map-info-panel { font-size: 21px; }
+body.font-small .map-info-panel h4 { font-size: 16px; }
+body.font-medium .map-info-panel h4 { font-size: 21px; }
+body.font-large .map-info-panel h4 { font-size: 26px; }
+body.font-small .map-info-scores,
+body.font-small .map-info-notes,
+body.font-small .map-info-btn,
+body.font-small .likes-row button { font-size: 12px; }
+body.font-medium .map-info-scores,
+body.font-medium .map-info-notes,
+body.font-medium .map-info-btn,
+body.font-medium .likes-row button { font-size: 16px; }
+body.font-large .map-info-scores,
+body.font-large .map-info-notes,
+body.font-large .map-info-btn,
+body.font-large .likes-row button { font-size: 20px; }
+body.font-large .btn,
+body.font-large .form-control,
+body.font-large .chip,
+body.font-large .nav-link { font-size: 1.1rem; }
+body.font-small .btn,
+body.font-small .form-control,
+body.font-small .chip,
+body.font-small .nav-link { font-size: .85rem; }
+
+/* Кнопку фильтра вверх на 5 пикселей */
+.filter-fab { bottom: 17px !important; }
+.filter-drawer { bottom: 69px !important; }
+
+@media (max-width:760px){
+  .ui-controls{align-items:flex-start; gap:8px;}
+  .ui-control-label{font-size:11px;}
+}

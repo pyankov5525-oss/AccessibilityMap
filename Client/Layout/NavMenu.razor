@@ -31,14 +31,20 @@
     </nav>
 
     <div class="ui-controls">
-        <div class="theme-switch" title="Тема">
-            <button class="theme-btn @(theme == "light" ? "active" : "")" @onclick='@(() => SetTheme("light"))'>☀️</button>
-            <button class="theme-btn @(theme == "dark" ? "active" : "")" @onclick='@(() => SetTheme("dark"))'>🌙</button>
+        <div class="ui-control-block">
+            <div class="ui-control-label">Цветовая тема</div>
+            <div class="theme-switch" title="Цветовая тема">
+                <button class="theme-btn @(theme == "light" ? "active" : "")" @onclick='@(() => SetTheme("light"))'>☀️</button>
+                <button class="theme-btn @(theme == "dark" ? "active" : "")" @onclick='@(() => SetTheme("dark"))'>🌙</button>
+            </div>
         </div>
-        <div class="font-switch" title="Размер шрифта">
-            <button class="font-btn @(fontSize == "small" ? "active" : "")" @onclick='@(() => SetFont("small"))'>Мал</button>
-            <button class="font-btn @(fontSize == "medium" ? "active" : "")" @onclick='@(() => SetFont("medium"))'>Сред</button>
-            <button class="font-btn @(fontSize == "large" ? "active" : "")" @onclick='@(() => SetFont("large"))'>Больш</button>
+        <div class="ui-control-block">
+            <div class="ui-control-label">Шрифт</div>
+            <div class="font-switch" title="Шрифт">
+                <button class="font-btn @(fontSize == "small" ? "active" : "")" @onclick='@(() => SetFont("small"))'>Мал</button>
+                <button class="font-btn @(fontSize == "medium" ? "active" : "")" @onclick='@(() => SetFont("medium"))'>Сред</button>
+                <button class="font-btn @(fontSize == "large" ? "active" : "")" @onclick='@(() => SetFont("large"))'>Больш</button>
+            </div>
         </div>
     </div>
 
