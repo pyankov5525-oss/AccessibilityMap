@@ -11,6 +11,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
 
     public DbSet<PlacemarkModel> Placemarks { get; set; }
     public DbSet<ActivityLog> ActivityLogs { get; set; }
+    public DbSet<PhotoModel> Photos { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -25,6 +26,15 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
             entity.Ignore(e => e.TotalScore);
             entity.Ignore(e => e.Level);
             entity.Ignore(e => e.LevelText);
+        });
+
+        modelBuilder.Entity<PhotoModel>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.FileName).IsUnique();
+            entity.Property(e => e.FileName).IsRequired();
+            entity.Property(e => e.ContentType).IsRequired();
+            entity.Property(e => e.Data).IsRequired();
         });
     }
 }

@@ -862,3 +862,90 @@ body.font-small .nav-link { font-size: .85rem; }
   .ui-controls{align-items:flex-start; gap:8px;}
   .ui-control-label{font-size:11px;}
 }
+
+/* === Исправления UX: мягкие границы, меньше отступов, вход === */
+body.theme-light {
+  --border: #d6dde8;
+  --text: #111827;
+  --text-dim: #374151;
+  --bg: #f7f9fc;
+  --bg-elev: #ffffff;
+  --bg-input: #ffffff;
+}
+body.theme-light .topbar,
+body.theme-light .form-card,
+body.theme-light .places-table,
+body.theme-light .detail-panel,
+body.theme-light .login-card,
+body.theme-light .filter-drawer,
+body.theme-light .map-info-panel,
+body.theme-light .about-card,
+body.theme-light .attachment-card,
+body.theme-light .modal-card-custom,
+body.theme-light .chip,
+body.theme-light .subtab,
+body.theme-light .score-btn,
+body.theme-light .stat,
+body.theme-light .btn-secondary,
+body.theme-light .form-control,
+body.theme-light .theme-switch,
+body.theme-light .font-switch,
+body.theme-light .photo-chip,
+body.theme-light .likes-row button {
+  border-color: #d6dde8 !important;
+}
+body.theme-light,
+body.theme-light p,
+body.theme-light td,
+body.theme-light th,
+body.theme-light label,
+body.theme-light span,
+body.theme-light div,
+body.theme-light .muted,
+body.theme-light .form-label,
+body.theme-light .nav-link,
+body.theme-light .brand,
+body.theme-light .map-info-panel,
+body.theme-light .map-info-notes,
+body.theme-light .map-info-scores,
+body.theme-light .about-card p,
+body.theme-light .about-card ul,
+body.theme-light .places-table td,
+body.theme-light .places-table th {
+  color: #111827 !important;
+}
+body.theme-light .muted,
+body.theme-light .form-label,
+body.theme-light .map-info-notes,
+body.theme-light .about-card p,
+body.theme-light .about-card ul { color: #374151 !important; }
+body.theme-light .chip-active,
+body.theme-light .subtab-active,
+body.theme-light .score-btn-active,
+body.theme-light .theme-btn.active,
+body.theme-light .font-btn.active,
+body.theme-light .btn-primary,
+body.theme-light .btn-success,
+body.theme-light .btn-danger,
+body.theme-light .map-banner,
+body.theme-light .level-badge,
+body.theme-light .map-info-level,
+body.theme-light .map-info-btn {
+  color: #fff !important;
+}
+
+.topbar { padding: 7px 14px; gap: 12px; }
+.app-main { padding: 6px 8px; }
+.map-page { height: calc(100vh - 58px); }
+.map { border-radius: 8px; }
+.password-row { display:flex; gap:6px; }
+.password-row .form-control { flex:1; }
+.password-toggle { min-width:48px; }
+.filter-fab { bottom: 22px !important; }
+.filter-drawer { bottom: 74px !important; }
+
+@media (max-width: 760px) {
+  .topbar { padding: 6px 8px; gap: 6px; }
+  .app-main { padding: 4px; }
+  .map-page { height: calc(100vh - 124px); min-height: 520px; }
+}

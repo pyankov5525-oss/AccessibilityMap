@@ -340,13 +340,18 @@ public class PlacemarksController : ControllerBase
             return BadRequest(new { error = "Недопустимый тип файла (только изображения)" });
         }
 
-        var uploads = Path.Combine(_env.ContentRootPath, "uploads");
-        Directory.CreateDirectory(uploads);
+        var fileName = Guid.NewGuid().ToString("N") + ext.ToLowerInvariant();
+        await using var ms = new MemoryStream();
+        await file.CopyToAsync(ms);
 
-        var fileName = Guid.NewGuid().ToString("N") + ext;
-        var fullPath = Path.Combine(uploads, fileName);
-        await using var stream = System.IO.File.Create(fullPath);
-        await file.CopyToAsync(stream);
+        _db.Photos.Add(new PhotoModel
+        {
+            FileName = fileName,
+            ContentType = GetContentType(fileName),
+            Data = ms.ToArray(),
+            UploadedAt = DateTime.UtcNow
+        });
+        await _db.SaveChangesAsync();
 
         return Ok(new { fileName });
     }
@@ -361,15 +366,24 @@ public class PlacemarksController : ControllerBase
             return BadRequest(new { error = "Некорректное имя файла" });
         }
 
+        var dbPhoto = _db.Photos.FirstOrDefault(p => p.FileName == fileName);
+        if (dbPhoto != null)
+            return File(dbPhoto.Data, dbPhoto.ContentType);
+
+        // fallback для старых локальных файлов, если они ещё есть на диске
         var uploads = Path.Combine(_env.ContentRootPath, "uploads");
         var fullPath = Path.Combine(uploads, fileName);
         if (!System.IO.File.Exists(fullPath))
-        {
             return NotFound();
-        }
 
+        return PhysicalFile(fullPath, GetContentType(fileName));
+    }
+
+
+    private static string GetContentType(string fileName)
+    {
         var ext = Path.GetExtension(fileName).ToLowerInvariant();
-        var contentType = ext switch
+        return ext switch
         {
             ".jpg" or ".jpeg" => "image/jpeg",
             ".png" => "image/png",
@@ -377,8 +391,6 @@ public class PlacemarksController : ControllerBase
             ".webp" => "image/webp",
             _ => "application/octet-stream"
         };
-
-        return PhysicalFile(fullPath, contentType);
     }
 
     [HttpPost("{id}/verify")]

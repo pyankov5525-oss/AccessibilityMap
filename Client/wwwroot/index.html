@@ -136,7 +136,15 @@
         }
 
         function setCategoryFilter(categories) {
-            currentCategoryFilter = Array.isArray(categories) ? categories : [];
+            if (Array.isArray(categories)) {
+                currentCategoryFilter = categories;
+            } else if (categories && typeof categories.length === 'number') {
+                currentCategoryFilter = Array.prototype.slice.call(categories);
+            } else if (typeof categories === 'string' && categories.length > 0) {
+                currentCategoryFilter = [categories];
+            } else {
+                currentCategoryFilter = [];
+            }
             showPlacemarks();
             updateCounter();
         }

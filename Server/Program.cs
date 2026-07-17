@@ -262,6 +262,7 @@ static async Task EnsureUserSchemaAsync(AppDbContext db, bool usePostgres)
             TryAddColumnSqlite(db, "CreatedByFullName", "Placemarks");
             TryAddColumnSqlite(db, "Likes", "Placemarks", "integer NOT NULL DEFAULT 0");
             TryAddColumnSqlite(db, "Dislikes", "Placemarks", "integer NOT NULL DEFAULT 0");
+            db.Database.ExecuteSqlRaw("CREATE TABLE IF NOT EXISTS Photos (Id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, FileName TEXT NOT NULL UNIQUE, ContentType TEXT NOT NULL, Data BLOB NOT NULL, UploadedAt TEXT NOT NULL);");
         }
     }
     catch { }

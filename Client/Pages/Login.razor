@@ -9,17 +9,20 @@
         <p class="muted">Войдите в систему</p>
         <div class="field">
             <label class="form-label">Логин:</label>
-            <input @bind="login" @bind:event="oninput" class="form-control" />
+            <input @bind="login" @bind:event="oninput" class="form-control" autocomplete="username" />
         </div>
         <div class="field">
             <label class="form-label">Пароль:</label>
-            <input type="password" @bind="password" @bind:event="oninput" class="form-control" />
+            <div class="password-row">
+                <input type="@(showPassword ? "text" : "password")" @bind="password" @bind:event="oninput" class="form-control" autocomplete="current-password" />
+                <button type="button" class="btn btn-secondary password-toggle" @onclick="@(() => showPassword = !showPassword)">@(showPassword ? "🙈" : "👁️")</button>
+            </div>
         </div>
         <div class="field">
             <label class="form-label">Проверка (капча): <b>@captchaQuestion</b></label>
             <input @bind="captchaAnswer" @bind:event="oninput" class="form-control" placeholder="Введите ответ" />
         </div>
-        <button class="btn btn-primary" @onclick="DoLogin">Войти</button>
+        <button class="btn btn-primary" disabled="@isLoggingIn" @onclick="DoLogin">@(isLoggingIn ? "Входим..." : "Войти")</button>
         @if (!string.IsNullOrEmpty(error))
         {
             <div class="alert alert-danger">@error</div>
@@ -34,6 +37,8 @@
     private string captchaQuestion = "";
     private string captchaAnswer = "";
     private string error = "";
+    private bool showPassword = false;
+    private bool isLoggingIn = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -57,18 +62,20 @@
 
     private async Task DoLogin()
     {
+        if (isLoggingIn) return;
         error = "";
+        isLoggingIn = true;
         try
         {
             var response = await Http.PostAsJsonAsync("/api/auth/login",
-                new { Login = login, Password = password, CaptchaToken = captchaToken, CaptchaAnswer = captchaAnswer });
+                new { Login = login.Trim(), Password = password.Trim(), CaptchaToken = captchaToken, CaptchaAnswer = captchaAnswer.Trim() });
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<LoginResult>();
                 if (result != null)
                 {
                     await Auth.SetAsync(result.Token, result.UserName, result.Role, result.ProfileComplete);
-                    Nav.NavigateTo("");
+                    Nav.NavigateTo("/", replace: true);
                 }
             }
             else
@@ -82,12 +89,17 @@
                 {
                     error = "Неверный логин или пароль";
                 }
-                await LoadCaptcha(); // при ошибке — новая капча
+                await LoadCaptcha();
             }
         }
         catch (Exception ex)
         {
             error = "Ошибка входа: " + ex.Message;
+            await LoadCaptcha();
+        }
+        finally
+        {
+            isLoggingIn = false;
         }
     }
 

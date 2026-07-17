@@ -554,7 +554,12 @@
         }
         else
         {
-            message = "Ошибка при сохранении";
+            try
+            {
+                var text = await response.Content.ReadAsStringAsync();
+                message = string.IsNullOrWhiteSpace(text) ? "Ошибка при сохранении" : text;
+            }
+            catch { message = "Ошибка при сохранении"; }
             isError = true;
         }
     }
