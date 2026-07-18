@@ -36,7 +36,7 @@
 
     @if (showCounter)
     {
-        <div class="map-stats">
+        <div class="map-stats @(Auth.IsAuthenticated ? "map-stats-auth" : "map-stats-guest")">
             <div class="stat"><b>@totalCount</b><span>всего</span></div>
             <div class="stat stat-green"><b>@greenCount</b><span>доступно</span></div>
             <div class="stat stat-gold"><b>@goldCount</b><span>частично</span></div>

@@ -1733,3 +1733,45 @@ body.theme-dark .level-red {
     min-width: 40px !important;
   }
 }
+
+/* Мобильные точечные правки: поиск, режимы, счётчик гостя */
+@media (max-width: 760px) {
+  /* Кнопка поиска по центру относительно поля */
+  #customSearchInput {
+    height: 34px !important;
+    box-sizing: border-box !important;
+  }
+  #customSearchBtn {
+    height: 34px !important;
+    width: 34px !important;
+    min-width: 34px !important;
+    box-sizing: border-box !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    line-height: 1 !important;
+    vertical-align: middle !important;
+    padding: 0 !important;
+  }
+  #customSearchInput,
+  #customSearchBtn {
+    transform: translateY(0) !important;
+  }
+
+  /* Поднять переключатель режимов выше */
+  #mapModeSwitcher {
+    transform: translateY(-14px) !important;
+  }
+
+  /* У гостя только 4 счётчика, поэтому фон не должен быть как на 5 */
+  .map-stats.map-stats-guest {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    width: min(236px, calc(100vw - 82px)) !important;
+    max-width: min(236px, calc(100vw - 82px)) !important;
+  }
+  .map-stats.map-stats-auth {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    width: min(292px, calc(100vw - 82px)) !important;
+    max-width: min(292px, calc(100vw - 82px)) !important;
+  }
+}
