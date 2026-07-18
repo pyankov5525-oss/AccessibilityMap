@@ -1775,3 +1775,10 @@ body.theme-dark .level-red {
     max-width: min(292px, calc(100vw - 82px)) !important;
   }
 }
+
+/* Мобильный переключатель режимов — ещё выше */
+@media (max-width: 760px) {
+  #mapModeSwitcher {
+    transform: translateY(-28px) !important;
+  }
+}
