@@ -1672,3 +1672,64 @@ body.theme-dark .level-red {
     -webkit-overflow-scrolling: touch;
   }
 }
+
+/* Мобильный фикс: переключатель режимов и счётчик не вылезают за экран */
+@media (max-width: 760px) {
+  #mapModeSwitcher {
+    transform: none !important;
+    max-width: min(236px, calc(100vw - 128px)) !important;
+    width: auto !important;
+    border-width: 1px !important;
+    border-radius: 8px !important;
+    font-size: 10px !important;
+    box-shadow: 0 2px 7px rgba(0,0,0,.25) !important;
+  }
+  #mapModeSwitcher button {
+    width: auto !important;
+    max-width: 78px !important;
+    min-width: 54px !important;
+    padding: 6px 6px !important;
+    font-size: 10px !important;
+    line-height: 1 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .map-stats {
+    display: grid !important;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    width: min(292px, calc(100vw - 82px)) !important;
+    max-width: min(292px, calc(100vw - 82px)) !important;
+    left: 6px !important;
+    right: auto !important;
+    bottom: 10px !important;
+    gap: 3px !important;
+    padding: 4px !important;
+    border-radius: 10px !important;
+    overflow: hidden !important;
+  }
+  .map-stats .stat {
+    min-width: 0 !important;
+    width: auto !important;
+    padding: 3px 2px !important;
+    border-radius: 7px !important;
+  }
+  .map-stats .stat b {
+    font-size: 12px !important;
+    line-height: 1 !important;
+  }
+  .map-stats .stat span {
+    font-size: 8px !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+  }
+
+  .filter-fab {
+    right: 8px !important;
+    bottom: 8px !important;
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+  }
+}

@@ -184,17 +184,20 @@
                     });
                     try { map.controls.remove('routeButton'); } catch (e) {}
 
+                    var normalText = isMobileView() ? 'Карта' : 'Обычная карта';
+                    var accessText = isMobileView() ? 'Доступ' : 'Доступность';
+                    var verifyText = isMobileView() ? 'Проверка' : 'Проверка меток';
                     var verifyHtml = window.canVerify
-                        ? '<button id="modeVerifyBtn" onclick="setMapMode(\'verify\')" style="padding:9px 12px; border:0; border-left:1px solid rgba(255,255,255,.18); cursor:pointer; font-weight:700; color:#fff; background:#242c36;">Проверка меток</button>'
+                        ? '<button id="modeVerifyBtn" onclick="setMapMode(\'verify\')" style="padding:9px 12px; border:0; border-left:1px solid rgba(255,255,255,.18); cursor:pointer; font-weight:700; color:#fff; background:#242c36;">' + verifyText + '</button>'
                         : '';
                     var modeSwitcher = new ymaps.control.Button({
                         data: { title: 'Режим карты' },
                         options: {
-                            maxWidth: 520,
+                            maxWidth: isMobileView() ? 260 : 520,
                             layout: ymaps.templateLayoutFactory.createClass(
                                 '<div id="mapModeSwitcher" style="display:flex; overflow:hidden; border:2px solid #3b82f6; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,.35); background:#161c24; font-size:14px; white-space:nowrap;">' +
-                                '<button id="modeNormalBtn" onclick="setMapMode(\'normal\')" style="padding:9px 12px; border:0; cursor:pointer; font-weight:700; color:#fff; background:#242c36;">Обычная карта</button>' +
-                                '<button id="modeAccessBtn" onclick="setMapMode(\'accessibility\')" style="padding:9px 12px; border:0; border-left:1px solid rgba(255,255,255,.18); cursor:pointer; font-weight:700; color:#fff; background:#242c36;">Доступность</button>' +
+                                '<button id="modeNormalBtn" onclick="setMapMode(\'normal\')" style="padding:9px 12px; border:0; cursor:pointer; font-weight:700; color:#fff; background:#242c36;">' + normalText + '</button>' +
+                                '<button id="modeAccessBtn" onclick="setMapMode(\'accessibility\')" style="padding:9px 12px; border:0; border-left:1px solid rgba(255,255,255,.18); cursor:pointer; font-weight:700; color:#fff; background:#242c36;">' + accessText + '</button>' +
                                 verifyHtml +
                                 '</div>'
                             )
