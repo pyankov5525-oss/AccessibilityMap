@@ -1230,3 +1230,13 @@ body.theme-dark .level-red {
 @media (max-width: 760px) {
   .map-page { height: calc(100dvh - 155px) !important; min-height: 420px !important; }
 }
+
+/* Сдвиг фильтра и счётчика меток ниже */
+.filter-fab { bottom: 12px !important; }
+.filter-drawer { bottom: 62px !important; }
+.map-stats { bottom: 26px !important; }
+@media (max-width: 760px) {
+  .filter-fab { bottom: 12px !important; }
+  .filter-drawer { bottom: 62px !important; }
+  .map-stats { bottom: 18px !important; }
+}
