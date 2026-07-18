@@ -8,7 +8,10 @@
     <a class="brand" href="" @onclick="ClosePanels">♿ Карта доступности</a>
     <nav class="nav-links">
         <NavLink class="nav-link" href="" Match="NavLinkMatch.All" @onclick="ClosePanels">Карта</NavLink>
-        <NavLink class="nav-link" href="places" @onclick="ClosePanels">Список</NavLink>
+        @if (Auth.IsAuthenticated)
+        {
+            <NavLink class="nav-link" href="places" @onclick="ClosePanels">Список</NavLink>
+        }
         @if (Auth.Role == "Manager" || Auth.Role == "Developer")
         {
             <NavLink class="nav-link" href="verify" @onclick="ClosePanels">Проверка</NavLink>
@@ -30,6 +33,18 @@
         }
     </nav>
 
+    <div class="user-box user-box-near-tabs">
+        @if (Auth.IsAuthenticated)
+        {
+            <span class="muted">@Auth.UserName · @RoleRu</span>
+            <button class="btn btn-sm btn-secondary" @onclick="Logout">Выйти</button>
+        }
+        else
+        {
+            <span class="muted guest-label">Гость</span>
+        }
+    </div>
+
     <div class="ui-controls">
         <div class="ui-control-block">
             <div class="ui-control-label">Цветовая тема</div>
@@ -46,18 +61,6 @@
                 <button class="font-btn @(fontSize == "large" ? "active" : "")" @onclick='@(() => SetFont("large"))'>Больш</button>
             </div>
         </div>
-    </div>
-
-    <div class="user-box">
-        @if (Auth.IsAuthenticated)
-        {
-            <span class="muted">@Auth.UserName · @RoleRu</span>
-            <button class="btn btn-sm btn-secondary" @onclick="Logout">Выйти</button>
-        }
-        else
-        {
-            <span class="muted guest-label">Гость</span>
-        }
     </div>
 </div>
 @if (Auth.IsAuthenticated && !Auth.ProfileComplete)

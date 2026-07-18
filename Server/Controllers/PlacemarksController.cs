@@ -74,7 +74,7 @@ public class PlacemarksController : ControllerBase
         // Хаверсин (метры) вместо евклидова расстояния по сырым градусам.
         var nearest = placemarks
             .Select(p => new { Placemark = p, Distance = Haversine(latitude, longitude, p.Latitude, p.Longitude) })
-            .Where(x => x.Distance < 50) // в радиусе 50 м считаем дубликатом
+            .Where(x => x.Distance < 5) // только почти точное попадание (5 м), чтобы не открывать метку при клике рядом
             .OrderBy(x => x.Distance)
             .FirstOrDefault();
 

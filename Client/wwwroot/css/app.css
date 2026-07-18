@@ -1148,3 +1148,76 @@ body.theme-light .level-badge { color: #fff !important; }
   cursor: pointer;
 }
 .form-close:hover { filter: brightness(.96); }
+
+/* === Финальные исправления по видимости/размерам === */
+/* Гость не видит вкладку списка через Razor; тут только компактность панели */
+.user-box-near-tabs {
+  order: 3;
+  margin-left: 4px;
+}
+.nav-links { order: 2; }
+.ui-controls { order: 4; margin-left: auto; }
+
+/* Ещё ниже карта, чтобы страница не скроллилась */
+.map-page { height: calc(100dvh - 92px) !important; }
+.app-main { padding-top: 0 !important; padding-bottom: 0 !important; }
+.topbar { min-height: 0 !important; }
+
+/* Крестик карточки метки не должен ехать при большом шрифте */
+.map-info-close {
+  position: absolute !important;
+  top: 8px !important;
+  right: 8px !important;
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  min-height: 30px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  line-height: 1 !important;
+  font-size: 18px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+.map-info-panel h4 { padding-right: 38px !important; }
+
+/* Максимальный контраст уровней во всех темах и вкладках */
+.level-green,
+body.theme-light .level-green,
+body.theme-dark .level-green {
+  background: #008a2e !important;
+  color: #fff !important;
+  border: 1px solid #006b24 !important;
+}
+.level-gold,
+body.theme-light .level-gold,
+body.theme-dark .level-gold {
+  background: #b86b00 !important;
+  color: #fff !important;
+  border: 1px solid #8a5100 !important;
+}
+.level-red,
+body.theme-light .level-red,
+body.theme-dark .level-red {
+  background: #c1121f !important;
+  color: #fff !important;
+  border: 1px solid #8f0d17 !important;
+}
+.level-badge { font-weight: 800 !important; opacity: 1 !important; }
+
+/* Профиль: поля не на всю страницу, но без маленькой карточки */
+.profile-full {
+  max-width: 920px !important;
+  grid-template-columns: repeat(2, minmax(240px, 420px)) !important;
+  justify-content: start !important;
+}
+.profile-full .form-control { max-width: 420px !important; }
+.profile-full textarea.form-control { max-width: 620px !important; }
+
+@media (max-width: 760px) {
+  .map-page { height: calc(100dvh - 145px) !important; min-height: 460px !important; }
+  .user-box-near-tabs { order: 4; width: 100%; }
+  .ui-controls { order: 5; margin-left: 0; }
+  .profile-full { grid-template-columns: 1fr !important; }
+}
