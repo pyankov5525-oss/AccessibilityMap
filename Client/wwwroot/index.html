@@ -248,15 +248,22 @@
 
         function setCanVerify(v) {
             window.canVerify = !!v;
+            var btn = document.getElementById('modeVerifyBtn');
+            if (btn) btn.style.display = window.canVerify ? '' : 'none';
+            if (!window.canVerify && verifyMode) setMapMode('normal');
+            renderModeSwitcher();
         }
 
         function setCanManagePlacemarks(v) {
             canManagePlacemarks = !!v;
+            hidePlacemarkPanel();
             showPlacemarks();
         }
 
         function setCanAddPlacemark(v) {
             canAddPlacemark = !!v;
+            showPlacemarks();
+            updateCounter();
         }
 
         function setMapMode(mode) {

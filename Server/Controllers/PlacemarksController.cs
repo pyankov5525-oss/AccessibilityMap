@@ -52,6 +52,7 @@ public class PlacemarksController : ControllerBase
     {
         var p = await _db.Placemarks.FindAsync(id);
         if (p == null) return NotFound();
+        if (User.Identity?.IsAuthenticated != true && p.VerificationStatus != "approved") return NotFound();
         return Ok(ToDto(p));
     }
 
@@ -65,7 +66,10 @@ public class PlacemarksController : ControllerBase
             return BadRequest("Invalid coordinates");
         }
 
-        var placemarks = await _db.Placemarks.ToListAsync();
+        var nearestQuery = _db.Placemarks.AsQueryable();
+        if (User.Identity?.IsAuthenticated != true)
+            nearestQuery = nearestQuery.Where(p => p.VerificationStatus == "approved");
+        var placemarks = await nearestQuery.ToListAsync();
 
         // Хаверсин (метры) вместо евклидова расстояния по сырым градусам.
         var nearest = placemarks

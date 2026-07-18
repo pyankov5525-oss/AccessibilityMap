@@ -51,8 +51,11 @@
     @if (showForm)
     {
         <div class="map-form-overlay">
-            <div class="form-card">
-                <h5 class="form-title">@(editingId.HasValue ? "Редактировать объект" : "Добавить объект")</h5>
+            <div class="form-card map-form-card">
+                <div class="form-head">
+                    <h5 class="form-title">@(editingId.HasValue ? "Редактировать объект" : "Добавить объект")</h5>
+                    <button type="button" class="form-close" @onclick="CloseForm">×</button>
+                </div>
 
                 <div class="field">
                     <label class="form-label">Адрес:</label>
@@ -185,6 +188,35 @@
         await JS.InvokeVoidAsync("setCategoryFilter", "");
     }
 
+
+    protected override void OnInitialized()
+    {
+        Auth.OnChange += HandleAuthChanged;
+    }
+
+    private async void HandleAuthChanged()
+    {
+        await InvokeAsync(async () =>
+        {
+            await ApplyMapPermissionsAsync();
+            await LoadPlacemarks();
+            showCounter = false;
+            StateHasChanged();
+        });
+    }
+
+    private async Task ApplyMapPermissionsAsync()
+    {
+        var canModerate = Auth.Role == "Developer" || Auth.Role == "Manager";
+        try
+        {
+            await JS.InvokeVoidAsync("setCanVerify", canModerate);
+            await JS.InvokeVoidAsync("setCanManagePlacemarks", canModerate);
+            await JS.InvokeVoidAsync("setCanAddPlacemark", Auth.IsAuthenticated);
+        }
+        catch { }
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -193,9 +225,7 @@
             {
                 dotNetRef = DotNetObjectReference.Create(this);
                 await JS.InvokeVoidAsync("setDotNetRef", dotNetRef);
-                await JS.InvokeVoidAsync("setCanVerify", Auth.Role == "Developer" || Auth.Role == "Manager");
-                await JS.InvokeVoidAsync("setCanManagePlacemarks", Auth.Role == "Developer" || Auth.Role == "Manager");
-                await JS.InvokeVoidAsync("setCanAddPlacemark", Auth.IsAuthenticated);
+                await ApplyMapPermissionsAsync();
                 await LoadPlacemarks();
 
                 var query = new Uri(Navigation.Uri).Query;
@@ -576,6 +606,7 @@
 
     public void Dispose()
     {
+        Auth.OnChange -= HandleAuthChanged;
         dotNetRef?.Dispose();
         try { JS.InvokeVoidAsync("destroyMap"); } catch { }
     }
