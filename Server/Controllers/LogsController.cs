@@ -21,7 +21,7 @@ public class LogsController : ControllerBase
 
     // type: login | placemark | action (необязательно — без фильтра отдаёт всё)
     [HttpGet]
-    public async Task<IActionResult> Get([FromQuery] string? type)
+    public async Task<IActionResult> Get([FromQuery] string? type, [FromQuery] string? user)
     {
         try
         {
@@ -29,6 +29,11 @@ public class LogsController : ControllerBase
             if (!string.IsNullOrEmpty(type))
             {
                 query = query.Where(l => l.Type == type);
+            }
+            if (!string.IsNullOrWhiteSpace(user))
+            {
+                var u = user.Trim().ToLower();
+                query = query.Where(l => l.UserName != null && l.UserName.ToLower().Contains(u));
             }
 
             var list = await query

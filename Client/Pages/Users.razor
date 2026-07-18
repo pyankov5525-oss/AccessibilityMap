@@ -127,6 +127,19 @@ else if (Auth.Role == "Developer" || Auth.Role == "Manager")
             <button class="subtab @(activeTab == "Volunteer" ? "subtab-active" : "")" @onclick="@(() => SetTab("Volunteer"))">Волонтёры (@CountRole("Volunteer"))</button>
         </div>
 
+        <div class="toolbar users-filter-bar">
+            <input class="form-control search-box" placeholder="Фильтр по нику..." value="@userSearch" @oninput="OnUserSearch" />
+            <select class="form-control search-box" value="@roleFilter" @onchange="OnRoleFilter">
+                <option value="all">Все роли</option>
+                @if (Auth.Role == "Developer")
+                {
+                    <option value="Developer">Разработчики</option>
+                    <option value="Manager">Управляющие</option>
+                }
+                <option value="Volunteer">Волонтёры</option>
+            </select>
+        </div>
+
         <table class="places-table">
             <thead>
                 <tr>
@@ -174,7 +187,7 @@ else if (Auth.Role == "Developer" || Auth.Role == "Manager")
                         <button class="btn btn-sm btn-info" @onclick="() => ViewProfile(u.Id)">Профиль</button>
                     </td>
                     <td class="row-actions">
-                        <button class="btn btn-sm btn-danger" disabled="@(!CanDeleteUser(u, isSelf))" @onclick="() => DeleteUser(u.Id)">Удалить</button>
+                        <button class="btn btn-sm @(u.Status == "blocked" ? "btn-success" : "btn-danger")" disabled="@(!CanDeleteUser(u, isSelf))" @onclick="() => DeleteUser(u.Id)">@(u.Status == "blocked" ? "Разблокировать" : "Блокировать")</button>
                     </td>
                 </tr>
             }
@@ -194,6 +207,8 @@ else if (Auth.Role == "Developer" || Auth.Role == "Manager")
     private bool loading = true;
     private string message = "";
     private string activeTab = "all";
+    private string userSearch = "";
+    private string roleFilter = "all";
     private DbStatus? dbStatus;
 
     private bool showCreateWindow = false;
@@ -212,9 +227,21 @@ else if (Auth.Role == "Developer" || Auth.Role == "Manager")
         ? users.Where(u => u.Role == "Volunteer").ToList()
         : users;
 
-    private List<UserRow> FilteredUsers => activeTab == "all"
-        ? VisibleUsers
-        : VisibleUsers.Where(u => u.Role == activeTab).ToList();
+    private List<UserRow> FilteredUsers
+    {
+        get
+        {
+            var q = VisibleUsers.AsEnumerable();
+            if (activeTab != "all") q = q.Where(u => u.Role == activeTab);
+            if (roleFilter != "all") q = q.Where(u => u.Role == roleFilter);
+            if (!string.IsNullOrWhiteSpace(userSearch))
+            {
+                var s = userSearch.Trim().ToLowerInvariant();
+                q = q.Where(u => (u.UserName ?? "").ToLowerInvariant().Contains(s));
+            }
+            return q.ToList();
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -252,6 +279,9 @@ else if (Auth.Role == "Developer" || Auth.Role == "Manager")
     private void SetTab(string tab) => activeTab = tab;
 
     private int CountRole(string role) => VisibleUsers.Count(x => x.Role == role);
+
+    private void OnUserSearch(ChangeEventArgs e) => userSearch = e.Value?.ToString() ?? "";
+    private void OnRoleFilter(ChangeEventArgs e) => roleFilter = e.Value?.ToString() ?? "all";
 
     private void OpenManualCreate()
     {
@@ -339,7 +369,7 @@ else if (Auth.Role == "Developer" || Auth.Role == "Manager")
     private async Task ChangeRole(string id, string role)
     {
         var resp = await Http.PostAsJsonAsync($"/api/auth/{id}/role", new { Role = role });
-        message = resp.IsSuccessStatusCode ? "" : await ReadError(resp);
+        message = resp.IsSuccessStatusCode ? "Статус пользователя изменён" : await ReadError(resp);
         await LoadUsers();
         StateHasChanged();
     }

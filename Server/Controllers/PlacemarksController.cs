@@ -74,7 +74,7 @@ public class PlacemarksController : ControllerBase
         // Хаверсин (метры) вместо евклидова расстояния по сырым градусам.
         var nearest = placemarks
             .Select(p => new { Placemark = p, Distance = Haversine(latitude, longitude, p.Latitude, p.Longitude) })
-            .Where(x => x.Distance < 5) // только почти точное попадание (5 м), чтобы не открывать метку при клике рядом
+            .Where(x => x.Distance < 0.5) // проверка дубля отключена практически полностью: только точное попадание
             .OrderBy(x => x.Distance)
             .FirstOrDefault();
 
@@ -461,41 +461,10 @@ public class PlacemarksController : ControllerBase
 
     [HttpPost("{id}/vote")]
     [AllowAnonymous]
-    public async Task<IActionResult> Vote(int id, [FromBody] VoteModel model)
+    public IActionResult Vote(int id, [FromBody] VoteModel model)
     {
-        var p = await _db.Placemarks.FindAsync(id);
-        if (p == null) return NotFound();
-
-        var value = model.Value > 0 ? 1 : model.Value < 0 ? -1 : 0;
-        if (value == 0) return BadRequest(new { error = "value должен быть 1 или -1" });
-
-        var voterKey = GetVoterKey();
-        var existing = await _db.PlacemarkVotes.FirstOrDefaultAsync(v => v.PlacemarkId == id && v.VoterKey == voterKey);
-
-        if (existing == null)
-        {
-            _db.PlacemarkVotes.Add(new PlacemarkVoteModel
-            {
-                PlacemarkId = id,
-                VoterKey = voterKey,
-                Value = value,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            });
-            if (value > 0) p.Likes++; else p.Dislikes++;
-        }
-        else if (existing.Value != value)
-        {
-            if (existing.Value > 0 && p.Likes > 0) p.Likes--;
-            if (existing.Value < 0 && p.Dislikes > 0) p.Dislikes--;
-            existing.Value = value;
-            existing.UpdatedAt = DateTime.UtcNow;
-            if (value > 0) p.Likes++; else p.Dislikes++;
-        }
-        // Если голос такой же — ничего не меняем, чтобы нельзя было накручивать.
-
-        await _db.SaveChangesAsync();
-        return Ok(new { p.Likes, p.Dislikes, userVote = existing?.Value ?? value });
+        // Лайки/дизлайки отключены по требованию: не оставляем открытый публичный endpoint для накрутки.
+        return StatusCode(410, new { error = "Голосование отключено" });
     }
 
     [HttpGet("attachments")]

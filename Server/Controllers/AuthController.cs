@@ -253,19 +253,23 @@ public class AuthController : ControllerBase
         if (currentRole == "Manager" && !roles.Contains("Volunteer"))
             return Forbid();
 
-        await _userManager.DeleteAsync(user);
+        // Вместо удаления блокируем/разблокируем аккаунт, чтобы не терять историю и логи.
+        user.Status = user.Status == "blocked" ? "active" : "blocked";
+        var result = await _userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+            return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
         try
         {
             _db.ActivityLogs.Add(new ActivityLog
             {
                 Type = "action",
                 UserName = User.Identity?.Name,
-                Description = $"Удалён пользователь {user.UserName}"
+                Description = user.Status == "blocked" ? $"Заблокирован пользователь {user.UserName}" : $"Разблокирован пользователь {user.UserName}"
             });
             await _db.SaveChangesAsync();
         }
         catch { }
-        return Ok(new { ok = true });
+        return Ok(new { ok = true, status = user.Status });
     }
 
     [HttpGet("profile")]
@@ -314,7 +318,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPut("{id}/profile")]
-    [Authorize(Roles = "Developer,Manager")]
+    [Authorize(Roles = "Developer")]
     public async Task<IActionResult> UpdateProfileForUser(string id, [FromBody] ProfileUpdateModel model)
     {
         var user = await _userManager.FindByIdAsync(id);
@@ -491,7 +495,7 @@ public class AuthController : ControllerBase
 
     // ===== Сброс пароля администратором (Dev/Manager) =====
     [HttpPost("{id}/reset-password")]
-    [Authorize(Roles = "Developer,Manager")]
+    [Authorize(Roles = "Developer")]
     public async Task<IActionResult> ResetPassword(string id, [FromBody] ResetPasswordModel model)
     {
         var user = await _userManager.FindByIdAsync(id);
@@ -539,8 +543,6 @@ public class AuthController : ControllerBase
         var targetRoles = await _userManager.GetRolesAsync(target);
         if (currentRole == "Developer")
             return true;
-        if (currentRole == "Manager")
-            return targetRoles.Contains("Volunteer");
         return false;
     }
 

@@ -284,18 +284,6 @@
             var latStr = lat.ToString(System.Globalization.CultureInfo.InvariantCulture);
             var lonStr = lon.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
-            // Проверяем дубликат (в радиусе 50 м)
-            var nearestResponse = await Http.GetAsync($"/api/placemarks/nearest?lat={latStr}&lon={lonStr}");
-            if (nearestResponse.IsSuccessStatusCode)
-            {
-                var existing = await nearestResponse.Content.ReadFromJsonAsync<PlacemarkData>();
-                if (existing != null && existing.Id > 0)
-                {
-                    await JS.InvokeVoidAsync("openBalloon", existing.Id);
-                    return;
-                }
-            }
-
             // Открываем форму; адрес подставим через обратный геокодинг на сервере
             newPlacemark = new NewPlacemark
             {

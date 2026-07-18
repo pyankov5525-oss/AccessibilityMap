@@ -1221,3 +1221,12 @@ body.theme-dark .level-red {
   .ui-controls { order: 5; margin-left: 0; }
   .profile-full { grid-template-columns: 1fr !important; }
 }
+
+/* Финальное уменьшение карты, чтобы главная не требовала скролла на ПК */
+.map-page { height: calc(100dvh - 125px) !important; min-height: 430px !important; }
+.map-stats { bottom: 48px !important; }
+.filter-fab { bottom: 24px !important; }
+.filter-drawer { bottom: 76px !important; }
+@media (max-width: 760px) {
+  .map-page { height: calc(100dvh - 155px) !important; min-height: 420px !important; }
+}

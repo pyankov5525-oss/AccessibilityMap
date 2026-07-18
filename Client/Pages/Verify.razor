@@ -53,7 +53,7 @@ else
                     <td><input type="checkbox" checked="@SelectedIds.Contains(it.Id)" @onclick:stopPropagation="true" @onchange="e => ToggleOne(it.Id, e.Value)" /></td>
                     <td>@it.Name</td><td>@it.Address</td><td>@(it.CreatedByFullName ?? "—")</td>
                     <td><span class="level-badge level-@it.Level">@it.LevelText</span></td>
-                    <td class="row-actions"><button class="btn btn-sm btn-secondary" @onclick="@(() => selected = it)">Подробнее</button><button class="btn btn-sm btn-success" @onclick='@(() => SetStatus(it.Id, "approved"))'>Одобрить</button><button class="btn btn-sm btn-danger" @onclick="@(() => DeleteOne(it.Id))">Удалить</button></td>
+                    <td class="row-actions"><button class="btn btn-sm btn-secondary" @onclick:stopPropagation="true" @onclick="@(() => selected = it)">Подробнее</button><button class="btn btn-sm btn-success" @onclick:stopPropagation="true" @onclick='@(() => SetStatus(it.Id, "approved"))'>Одобрить</button><button class="btn btn-sm btn-danger" @onclick:stopPropagation="true" @onclick="@(() => DeleteOne(it.Id))">Удалить</button></td>
                 </tr>
             }
             </tbody>

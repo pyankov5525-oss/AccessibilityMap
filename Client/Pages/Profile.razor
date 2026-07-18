@@ -44,18 +44,23 @@ else
         </div>
         <div class="field">
             <label class="form-label">ФИО</label>
-            <input @bind="editFullName" @bind:event="oninput" class="form-control" placeholder="Иванов Иван Иванович" />
+            <input @bind="editFullName" @bind:event="oninput" class="form-control" placeholder="Иванов Иван Иванович" disabled="@(!canEditProfile)" />
         </div>
         <div class="field">
             <label class="form-label">Дата рождения</label>
-            <input type="date" @bind="editDob" class="form-control" />
+            <input type="date" @bind="editDob" class="form-control" disabled="@(!canEditProfile)" />
         </div>
         <div class="field">
             <label class="form-label">О себе</label>
-            <textarea @bind="editAbout" @bind:event="oninput" class="form-control" rows="3"></textarea>
+            <textarea @bind="editAbout" @bind:event="oninput" class="form-control" rows="3" disabled="@(!canEditProfile)"></textarea>
         </div>
-        <button class="btn btn-success" @onclick="Save">Сохранить</button>
+        @if (canEditProfile)
+        {
+            <button class="btn btn-success" @onclick="Save">Сохранить</button>
+        }
 
+        @if (!isOtherProfile)
+        {
         <hr />
         <h5>Смена пароля</h5>
         <div class="field">
@@ -71,6 +76,7 @@ else
             <input type="password" @bind="newPwd2" @bind:event="oninput" class="form-control" />
         </div>
         <button class="btn btn-warning" @onclick="ChangePassword">Сменить пароль</button>
+        }
 
         @if (!string.IsNullOrEmpty(message))
         {
@@ -96,7 +102,9 @@ else
 
     private string? viewId;
 
-    private bool canEditStatus => Auth.Role == "Developer" || Auth.Role == "Manager";
+    private bool isOtherProfile => !string.IsNullOrEmpty(viewId);
+    private bool canEditProfile => !isOtherProfile || Auth.Role == "Developer";
+    private bool canEditStatus => Auth.Role == "Developer";
 
     protected override async Task OnInitializedAsync()
     {
@@ -144,6 +152,7 @@ else
 
     private async Task Save()
     {
+        if (!canEditProfile) return;
         var model = new { FullName = editFullName, DateOfBirth = editDob?.ToString("yyyy-MM-dd"), About = editAbout, Status = editStatus };
         HttpResponseMessage resp;
         if (!string.IsNullOrEmpty(viewId) && canEditStatus)

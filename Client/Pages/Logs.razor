@@ -11,6 +11,10 @@
     <button class="subtab @(tab == "action" ? "subtab-active" : "")" @onclick="@(() => SetTab("action"))">Действия</button>
 </div>
 
+<div class="toolbar" style="margin-bottom:12px;">
+    <input class="form-control search-box" placeholder="Фильтр по пользователю..." value="@userFilter" @oninput="OnUserFilter" />
+</div>
+
 @if (loading)
 {
     <p>Загрузка...</p>
@@ -44,6 +48,7 @@ else
 @code {
     private List<LogRow> logs = new();
     private string tab = "all";
+    private string userFilter = "";
     private bool loading = true;
 
     protected override async Task OnInitializedAsync() => await Load();
@@ -52,7 +57,10 @@ else
     {
         try
         {
-            var url = tab == "all" ? "/api/logs" : "/api/logs?type=" + tab;
+            var parts = new List<string>();
+            if (tab != "all") parts.Add("type=" + Uri.EscapeDataString(tab));
+            if (!string.IsNullOrWhiteSpace(userFilter)) parts.Add("user=" + Uri.EscapeDataString(userFilter.Trim()));
+            var url = "/api/logs" + (parts.Count > 0 ? "?" + string.Join("&", parts) : "");
             var resp = await Http.GetAsync(url);
             if (resp.IsSuccessStatusCode)
             {
@@ -75,6 +83,13 @@ else
     private async Task SetTab(string t)
     {
         tab = t;
+        loading = true;
+        await Load();
+    }
+
+    private async Task OnUserFilter(ChangeEventArgs e)
+    {
+        userFilter = e.Value?.ToString() ?? "";
         loading = true;
         await Load();
     }
