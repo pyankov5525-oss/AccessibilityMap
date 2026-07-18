@@ -44,6 +44,7 @@
         var currentCategoryFilter = [];
         var pendingCountForCounter = 0;
         var markerClusterer = null;
+        function isMobileView() { return window.matchMedia && window.matchMedia('(max-width: 760px)').matches; }
 
         function setDotNetRef(ref) {
             dotNetRef = ref;
@@ -119,7 +120,7 @@
                     } else {
                         hideSuggestions();
                     }
-                }, 250);
+                }, isMobileView() ? 500 : 250);
             });
 
             document.addEventListener('focusout', function (e) {
@@ -171,12 +172,14 @@
                     map = new ymaps.Map("map", {
                         center: [51.672, 39.192],
                         zoom: 12,
-                        controls: [
-                            'zoomControl',
-                            'typeSelector',
-                            'fullscreenControl',
-                            'trafficControl'
-                        ],
+                        controls: isMobileView()
+                            ? ['zoomControl']
+                            : [
+                                'zoomControl',
+                                'typeSelector',
+                                'fullscreenControl',
+                                'trafficControl'
+                            ],
                         suppressMapOpenBlock: true
                     });
                     try { map.controls.remove('routeButton'); } catch (e) {}
@@ -448,7 +451,7 @@
                 groupByCoordinates: false,
                 clusterDisableClickZoom: false,
                 clusterOpenBalloonOnClick: true,
-                gridSize: 64
+                gridSize: isMobileView() ? 96 : 64
             });
 
             var geoObjects = [];
@@ -462,8 +465,8 @@
                 }, {
                     iconLayout: 'default#image',
                     iconImageHref: 'https://cdn.jsdelivr.net/gh/pointhi/leaflet-color-markers@master/img/marker-icon-2x-' + markerIcon + '.png',
-                    iconImageSize: [22, 36],
-                    iconImageOffset: [-11, -36],
+                    iconImageSize: isMobileView() ? [18, 30] : [22, 36],
+                    iconImageOffset: isMobileView() ? [-9, -30] : [-11, -36],
                     balloonPanelMaxMapArea: 0
                 });
                 pm.events.add('click', function () {

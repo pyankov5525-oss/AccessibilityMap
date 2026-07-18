@@ -1475,3 +1475,200 @@ body.theme-dark .level-red {
     font-size: 18px !important;
   }
 }
+
+/* ============================================================
+   МОБИЛЬНАЯ ОПТИМИЗАЦИЯ ПАНЕЛЕЙ И КОНТРОЛОВ КАРТЫ
+   Только телефон, ПК не трогаем
+   ============================================================ */
+@media (max-width: 760px) {
+  /* Верхняя панель: компактная, вкладки не вылезают за экран */
+  .topbar {
+    display: grid !important;
+    grid-template-columns: auto 1fr auto !important;
+    grid-template-areas:
+      "brand nav user"
+      "ui ui ui" !important;
+    align-items: center !important;
+    gap: 3px 6px !important;
+    padding: 4px 6px !important;
+    max-width: 100vw !important;
+    overflow: hidden !important;
+  }
+
+  .brand {
+    grid-area: brand !important;
+    width: auto !important;
+    max-width: 118px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    font-size: 13px !important;
+  }
+
+  .nav-links {
+    grid-area: nav !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    gap: 2px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    padding: 0 0 2px !important;
+    scrollbar-width: none !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  .nav-links::-webkit-scrollbar { display: none !important; }
+
+  .nav-link {
+    flex: 0 0 auto !important;
+    padding: 4px 7px !important;
+    font-size: 12px !important;
+    line-height: 1.1 !important;
+    border-radius: 7px !important;
+    white-space: nowrap !important;
+  }
+
+  .user-box,
+  .user-box-near-tabs {
+    grid-area: user !important;
+    width: auto !important;
+    max-width: 86px !important;
+    min-width: 0 !important;
+    justify-content: flex-end !important;
+    gap: 3px !important;
+    overflow: hidden !important;
+  }
+  .user-box .muted,
+  .guest-label {
+    max-width: 72px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    font-size: 11px !important;
+  }
+  .user-box .btn { padding: 2px 5px !important; font-size: 10px !important; }
+
+  .ui-controls {
+    grid-area: ui !important;
+    width: 100% !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+    gap: 6px !important;
+    margin: 0 !important;
+  }
+  .ui-control-label { display: none !important; }
+  .theme-switch,
+  .font-switch {
+    min-height: 26px !important;
+    padding: 2px !important;
+    gap: 2px !important;
+  }
+  .theme-btn,
+  .font-btn {
+    height: 22px !important;
+    min-width: 34px !important;
+    padding: 2px 6px !important;
+    font-size: 11px !important;
+  }
+  .theme-btn { font-size: 14px !important; }
+
+  /* Из-за уменьшенной панели можно дать карте больше места */
+  .app-main { padding: 0 !important; }
+  .map-page {
+    height: calc(100dvh - 82px) !important;
+    min-height: 420px !important;
+  }
+
+  /* Счётчик меток: компактная плашка */
+  .map-stats {
+    left: 6px !important;
+    bottom: 42px !important;
+    gap: 3px !important;
+    padding: 4px !important;
+    border-radius: 9px !important;
+    max-width: calc(100vw - 64px) !important;
+    overflow-x: auto !important;
+    flex-wrap: nowrap !important;
+    scrollbar-width: none !important;
+  }
+  .map-stats::-webkit-scrollbar { display: none !important; }
+  .map-stats .stat {
+    min-width: 40px !important;
+    padding: 3px 5px !important;
+    border-radius: 7px !important;
+  }
+  .map-stats .stat b { font-size: 13px !important; line-height: 1 !important; }
+  .map-stats .stat span { font-size: 8px !important; line-height: 1 !important; }
+
+  /* Фильтр на телефоне — только круглая лупа */
+  .filter-fab {
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    right: 8px !important;
+    bottom: 8px !important;
+    font-size: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 3px 12px rgba(0,0,0,.28) !important;
+  }
+  .filter-fab::before {
+    content: "🔎";
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  /* Яндекс-поиск: компактный */
+  #customSearchInput {
+    width: 150px !important;
+    height: 30px !important;
+    padding: 4px 7px !important;
+    font-size: 12px !important;
+  }
+  #customSearchBtn {
+    width: 30px !important;
+    height: 30px !important;
+    padding: 0 !important;
+    font-size: 13px !important;
+  }
+  #customSearchSuggest {
+    width: 220px !important;
+    max-height: 180px !important;
+    font-size: 12px !important;
+  }
+
+  /* Переключатель режимов карты: компактный */
+  #mapModeSwitcher {
+    transform: scale(.74) !important;
+    transform-origin: top right !important;
+    border-radius: 8px !important;
+    font-size: 11px !important;
+    max-width: 300px !important;
+  }
+  #mapModeSwitcher button {
+    padding: 7px 8px !important;
+    font-size: 11px !important;
+    line-height: 1.05 !important;
+  }
+
+  /* Убираем тяжёлые/лишние визуальные элементы Яндекса на телефоне */
+  .ymaps-2-1-79-traffic-control,
+  .ymaps-2-1-79-type-selector,
+  .ymaps-2-1-79-fullscreen-control,
+  [class*="traffic"],
+  [class*="type-selector"] {
+    display: none !important;
+  }
+
+  /* Лёгкая оптимизация отрисовки */
+  .map-info-panel,
+  .filter-drawer,
+  .map-form-overlay {
+    will-change: transform;
+    -webkit-overflow-scrolling: touch;
+  }
+}
