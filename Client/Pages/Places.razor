@@ -41,7 +41,10 @@
                     <th>Адрес</th>
                     <th>Баллы</th>
                     <th>Уровень</th>
-                    <th></th>
+                    @if (CanManagePlacemarks)
+                    {
+                        <th></th>
+                    }
                 </tr>
             </thead>
             <tbody>
@@ -53,13 +56,13 @@
                         <td class="muted">@p.Address</td>
                         <td>@p.TotalScore / 21</td>
                         <td><span class="level-badge level-@p.Level">@p.LevelText</span></td>
-                        <td class="row-actions">
-                            @if (CanManagePlacemarks)
-                            {
+                        @if (CanManagePlacemarks)
+                        {
+                            <td class="row-actions">
                                 <button class="btn btn-sm btn-secondary" @onclick="@(() => Edit(p.Id))">Изменить</button>
                                 <button class="btn btn-sm btn-danger" @onclick="@(() => Delete(p.Id))">Удалить</button>
-                            }
-                        </td>
+                            </td>
+                        }
                     </tr>
                 }
             </tbody>

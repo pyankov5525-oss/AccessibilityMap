@@ -49,8 +49,8 @@ else
             <tbody>
             @foreach (var it in items)
             {
-                <tr>
-                    <td><input type="checkbox" checked="@SelectedIds.Contains(it.Id)" @onchange="e => ToggleOne(it.Id, e.Value)" /></td>
+                <tr class="selectable-row @(SelectedIds.Contains(it.Id) ? "row-selected" : "")" @onclick="() => ToggleOneByRow(it.Id)">
+                    <td><input type="checkbox" checked="@SelectedIds.Contains(it.Id)" @onclick:stopPropagation="true" @onchange="e => ToggleOne(it.Id, e.Value)" /></td>
                     <td>@it.Name</td><td>@it.Address</td><td>@(it.CreatedByFullName ?? "—")</td>
                     <td><span class="level-badge level-@it.Level">@it.LevelText</span></td>
                     <td class="row-actions"><button class="btn btn-sm btn-secondary" @onclick="@(() => selected = it)">Подробнее</button><button class="btn btn-sm btn-success" @onclick='@(() => SetStatus(it.Id, "approved"))'>Одобрить</button><button class="btn btn-sm btn-danger" @onclick="@(() => DeleteOne(it.Id))">Удалить</button></td>
@@ -77,6 +77,7 @@ else
         SelectedIds.RemoveWhere(id => !items.Any(x => x.Id == id));
     }
     private void ToggleOne(int id, object? value) { if (value is bool b && b) SelectedIds.Add(id); else SelectedIds.Remove(id); }
+    private void ToggleOneByRow(int id) { if (!SelectedIds.Add(id)) SelectedIds.Remove(id); }
     private void ToggleAll(ChangeEventArgs e) { if (e.Value is bool b && b) SelectedIds = items.Select(x => x.Id).ToHashSet(); else SelectedIds.Clear(); }
     private async Task SetStatus(int id, string status) { await Http.PostAsJsonAsync($"/api/placemarks/{id}/verify", new { Status = status }); selected = null; await LoadReview(); }
     private async Task BatchVerify(string status) { await Http.PostAsJsonAsync("/api/placemarks/batch-verify", new { Ids = SelectedIds.ToList(), Status = status }); SelectedIds.Clear(); await LoadReview(); }

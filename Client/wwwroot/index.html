@@ -129,13 +129,6 @@
             });
 
             document.addEventListener('click', function (e) {
-                var voteBtn = e.target.closest ? e.target.closest('[data-vote-id]') : null;
-                if (voteBtn) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    votePlacemark(parseInt(voteBtn.getAttribute('data-vote-id')), parseInt(voteBtn.getAttribute('data-vote-value')));
-                    return;
-                }
                 var galleryBtn = e.target.closest ? e.target.closest('[data-gallery-id]') : null;
                 if (galleryBtn) {
                     e.preventDefault();
@@ -259,6 +252,7 @@
 
         function setCanManagePlacemarks(v) {
             canManagePlacemarks = !!v;
+            showPlacemarks();
         }
 
         function setCanAddPlacemark(v) {
@@ -393,10 +387,10 @@
                     '<div>👥 Персонал <b>' + p.scores.staff + '/3</b></div>' +
                     '</div>';
             }
-            var photo = p.photoUrl ? '<img class="map-info-photo" src="' + escapeHtml(p.photoUrl) + '" alt="фото объекта" />' : '';
+            var photo = ''; // фото открываются отдельной кнопкой, чтобы карточка была компактной
             var photosButton = (p.photos && p.photos.length) ? '<button type="button" class="map-info-btn edit" data-gallery-id="' + p.id + '">📷 Фото (' + p.photos.length + ')</button>' : '';
-            var likes = '<div class="likes-row"><button type="button" data-vote-id="' + p.id + '" data-vote-value="1">👍 ' + (p.likes || 0) + '</button><button type="button" data-vote-id="' + p.id + '" data-vote-value="-1">👎 ' + (p.dislikes || 0) + '</button></div>';
-            var author = p.createdByFullName ? '<div class="map-info-notes">👤 Добавил: ' + escapeHtml(p.createdByFullName) + '</div>' : '';
+            var likes = '';
+            var author = (canManagePlacemarks && p.createdByFullName) ? '<div class="map-info-notes">👤 Добавил: ' + escapeHtml(p.createdByFullName) + '</div>' : '';
             var actions = canManagePlacemarks
                 ? '<div class="map-info-actions"><button onclick="editPlacemark(' + p.id + ')" class="map-info-btn edit">✏️ Изменить</button>' +
                   '<button onclick="deletePlacemark(' + p.id + ')" class="map-info-btn delete">🗑 Удалить</button></div>'
@@ -535,7 +529,6 @@
                 if (p) { p.likes = v.likes ?? v.Likes ?? p.likes; p.dislikes = v.dislikes ?? v.Dislikes ?? p.dislikes; openBalloon(id); }
             }).catch(function(e){ console.error('vote failed', e); });
         }
-        window.votePlacemark = votePlacemark;
         window.showPhotoGallery = showPhotoGallery;
         window.hidePlacemarkPanel = hidePlacemarkPanel;
         window.openBalloon = openBalloon;

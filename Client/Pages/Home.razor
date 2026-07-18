@@ -34,28 +34,18 @@
         </div>
     }
 
-    @if (showCounter)
+    @if (showCounter && Auth.IsAuthenticated)
     {
         <div class="map-stats">
             <div class="stat"><b>@totalCount</b><span>всего</span></div>
             <div class="stat stat-green"><b>@greenCount</b><span>доступно</span></div>
             <div class="stat stat-gold"><b>@goldCount</b><span>частично</span></div>
             <div class="stat stat-red"><b>@redCount</b><span>недоступно</span></div>
-            <div class="stat"><b>@pendingCount</b><span>на проверке</span></div>
+            @if (Auth.IsAuthenticated)
+            {
+                <div class="stat"><b>@pendingCount</b><span>на проверке</span></div>
+            }
         </div>
-    }
-
-    @if (verifyMode)
-    {
-        <div class="map-banner">🔍 Проверка меток включена — показаны только серые метки на модерации.</div>
-    }
-    else if (accessibilityMode)
-    {
-        <div class="map-banner">♿ Режим доступности включён — показаны одобренные метки. @(Auth.IsAuthenticated ? "Кликните по карте, чтобы добавить объект." : "Войдите, чтобы добавлять объекты.")</div>
-    }
-    else
-    {
-        <div class="map-hint">Выберите переключатель «Доступность» или «Проверка меток» справа сверху.</div>
     }
 
     @if (showForm)
@@ -449,15 +439,7 @@
         }
 
         await JS.InvokeVoidAsync("moveMapTo", lat, lon);
-        newPlacemark = new NewPlacemark
-        {
-            Latitude = lat,
-            Longitude = lon,
-            Address = text
-        };
-        editingId = null;
-        showForm = true;
-        message = "Заполните данные объекта";
+        message = "";
         isError = false;
         StateHasChanged();
     }

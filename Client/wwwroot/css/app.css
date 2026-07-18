@@ -1038,3 +1038,82 @@ body.theme-light .map-info-scores, body.theme-light .about-card p, body.theme-li
   .map-page { height: calc(100dvh - 112px) !important; min-height: 500px !important; }
   .theme-btn, .font-btn { min-width: 50px !important; }
 }
+
+/* === Правки карты/форм/таблиц после ревизии === */
+.map-page { height: calc(100dvh - 60px) !important; }
+.filter-fab { bottom: 32px !important; }
+.filter-drawer { bottom: 84px !important; }
+.map-stats { bottom: 56px !important; }
+.map-form-overlay { width: 390px !important; padding: 6px !important; }
+.map-form-overlay .form-card { padding: 10px !important; }
+.map-form-overlay .field { margin-bottom: 6px !important; }
+.map-form-overlay .form-control { padding: 5px 8px !important; min-height: 32px; }
+.map-form-overlay textarea.form-control { min-height: 46px; }
+.map-form-overlay .form-actions { margin-top: 5px !important; }
+.criteria-title { margin: 6px 0 4px !important; }
+.score-btn { min-height: 26px !important; padding: 3px 0 !important; }
+.map-info-close,
+.filter-drawer .detail-head .btn {
+  top: 8px !important;
+  line-height: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 auto !important;
+}
+.detail-head { align-items: flex-start !important; }
+
+/* Профиль на всю страницу, без маленькой карточки */
+.profile-full {
+  width: 100%;
+  max-width: none;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 12px 18px;
+}
+.profile-full hr,
+.profile-full h5,
+.profile-full .alert { grid-column: 1 / -1; }
+.profile-full button { width: fit-content; }
+@media (max-width:760px){ .profile-full { grid-template-columns: 1fr; } }
+
+/* Яркие уровни в светлой теме */
+body.theme-light .level-green { background: #16a34a !important; color: #fff !important; }
+body.theme-light .level-gold { background: #d97706 !important; color: #fff !important; }
+body.theme-light .level-red { background: #dc2626 !important; color: #fff !important; }
+body.theme-light .level-badge { color: #fff !important; }
+
+/* Удобное выделение строк проверки */
+.selectable-row { cursor: pointer; }
+.selectable-row:hover { background: rgba(59,130,246,.10) !important; }
+.row-selected { background: rgba(59,130,246,.20) !important; }
+
+/* Агрессивнее прячем служебные элементы Яндекса */
+.ymaps-2-1-79-copyright,
+.ymaps-2-1-79-copyrights-pane,
+.ymaps-2-1-79-map-copyrights-promo,
+.ymaps-2-1-79-copyright__wrap,
+.ymaps-2-1-79-copyright__content,
+.ymaps-2-1-79-copyright__link,
+.ymaps-2-1-79-gotoymaps,
+.ymaps-2-1-79-gototech,
+.ymaps-2-1-79-gototaxi,
+.ymaps-2-1-79-gotoymaps__container,
+.ymaps-2-1-79-copyright_logo_no,
+[class*="gotoymaps"],
+[class*="gototech"],
+[class*="copyright"] a[href*="yandex"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+@media (max-width:760px){
+  .map-page { height: calc(100dvh - 122px) !important; min-height: 500px !important; }
+  .filter-fab { bottom: 26px !important; }
+  .filter-drawer { bottom: 76px !important; }
+}
