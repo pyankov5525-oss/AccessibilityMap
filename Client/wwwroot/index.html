@@ -27,6 +27,7 @@
         <span class="dismiss">🗙</span>
     </div>
 
+    <script id="yandexMapsProxyScript" src="/api/config/yandex-maps-js" defer></script>
     <script src="_framework/blazor.webassembly.js"></script>
 
     <script>
@@ -67,25 +68,38 @@
             });
         }
 
+        function waitForExistingYmaps(timeoutMs) {
+            return new Promise(function(resolve, reject){
+                var started = Date.now();
+                (function check(){
+                    if (typeof ymaps !== 'undefined' && typeof ymaps.ready === 'function') return resolve();
+                    if (Date.now() - started > timeoutMs) return reject(new Error('Прокси-скрипт Яндекс.Карт не инициализировался'));
+                    setTimeout(check, 150);
+                })();
+            });
+        }
+
         function loadYandexMaps() {
             if (typeof ymaps !== 'undefined' && typeof ymaps.ready === 'function') return Promise.resolve();
             if (yandexMapsLoading) return yandexMapsLoading;
-            yandexMapsLoading = fetch('/api/config/yandex-maps-key')
-                .then(function(r){ return r.ok ? r.json() : { apiKey: '' }; })
-                .then(function(cfg){
-                    var key = cfg && cfg.apiKey ? String(cfg.apiKey).trim() : '';
-                    var withKey = 'https://api-maps.yandex.ru/2.1/?' + (key ? ('apikey=' + encodeURIComponent(key) + '&') : '') + 'lang=ru_RU&load=package.full';
-                    var withoutKey = 'https://api-maps.yandex.ru/2.1/?lang=ru_RU&load=package.full';
-                    var proxy = '/api/config/yandex-maps-js';
-                    return injectYandexScript(withKey, 'Яндекс.Карты с ключом')
-                        .catch(function(firstError){
-                            console.warn('Yandex Maps direct load failed, trying same-origin proxy', firstError);
+            yandexMapsLoading = waitForExistingYmaps(7000)
+                .catch(function(existingError){
+                    console.warn('Existing proxied Yandex Maps script not ready, trying dynamic fallback', existingError);
+                    return fetch('/api/config/yandex-maps-key')
+                        .then(function(r){ return r.ok ? r.json() : { apiKey: '' }; })
+                        .then(function(cfg){
+                            var key = cfg && cfg.apiKey ? String(cfg.apiKey).trim() : '';
+                            var proxy = '/api/config/yandex-maps-js?ts=' + Date.now();
+                            var withKey = 'https://api-maps.yandex.ru/2.1/?' + (key ? ('apikey=' + encodeURIComponent(key) + '&') : '') + 'lang=ru_RU&load=package.full';
+                            var withoutKey = 'https://api-maps.yandex.ru/2.1/?lang=ru_RU&load=package.full';
                             return injectYandexScript(proxy, 'Яндекс.Карты через серверный прокси')
                                 .catch(function(proxyError){
-                                    console.warn('Yandex Maps proxy failed, trying fallback without key', proxyError);
-                                    return injectYandexScript(withoutKey, 'Яндекс.Карты без ключа')
-                                        .catch(function(secondError){
-                                            throw new Error('Не удалось загрузить Яндекс.Карты. Прямая загрузка: ' + firstError.message + '. Прокси: ' + proxyError.message + '. Без ключа: ' + secondError.message);
+                                    return injectYandexScript(withKey, 'Яндекс.Карты с ключом')
+                                        .catch(function(firstError){
+                                            return injectYandexScript(withoutKey, 'Яндекс.Карты без ключа')
+                                                .catch(function(secondError){
+                                                    throw new Error('Не удалось загрузить Яндекс.Карты. Прокси: ' + proxyError.message + '. С ключом: ' + firstError.message + '. Без ключа: ' + secondError.message);
+                                                });
                                         });
                                 });
                         });
