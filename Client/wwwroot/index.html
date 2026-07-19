@@ -58,8 +58,15 @@
                         var key = cfg && cfg.apiKey ? String(cfg.apiKey) : '';
                         script.src = 'https://api-maps.yandex.ru/2.1/?' + (key ? ('apikey=' + encodeURIComponent(key) + '&') : '') + 'lang=ru_RU&load=package.full';
                         script.async = true;
-                        script.onload = function(){ resolve(); };
-                        script.onerror = function(){ reject(new Error('Не удалось загрузить Яндекс.Карты')); };
+                        script.onload = function(){
+                            var attempts = 0;
+                            (function waitYmaps(){
+                                if (typeof ymaps !== 'undefined' && typeof ymaps.ready === 'function') return resolve();
+                                if (attempts++ > 30) return reject(new Error('Яндекс.Карты загрузились, но API не инициализировался. Проверьте ключ и ограничения домена.'));
+                                setTimeout(waitYmaps, 200);
+                            })();
+                        };
+                        script.onerror = function(){ reject(new Error('Не удалось загрузить Яндекс.Карты. Проверьте YANDEX_MAPS_API_KEY и ограничения домена.')); };
                         document.head.appendChild(script);
                     });
                 });
@@ -75,6 +82,13 @@
                 console.warn('Map controls failed, creating minimal map', e);
                 return new ymaps.Map('map', { center: [51.672, 39.192], zoom: 12, controls: [], suppressMapOpenBlock: true });
             }
+        }
+
+        function showMapError(message) {
+            var el = document.getElementById('map');
+            if (!el) return;
+            el.innerHTML = '<div style="padding:18px;margin:12px;border-radius:12px;background:#fff3cd;color:#4a3200;border:1px solid #f0d98c;font-family:sans-serif;max-width:520px;">' +
+                '<b>Карта не загрузилась</b><br>' + String(message || 'Проверьте ключ Яндекс.Карт и настройки домена.') + '</div>';
         }
 
         function setDotNetRef(ref) {
@@ -194,7 +208,7 @@
         function updatePlacemarks(placemarks) {
             placemarksData = placemarks || [];
             if (typeof ymaps === 'undefined' || typeof ymaps.ready !== 'function') {
-                loadYandexMaps().then(function(){ updatePlacemarks(placemarks); }).catch(function(e){ console.error(e); });
+                loadYandexMaps().then(function(){ updatePlacemarks(placemarks); }).catch(function(e){ console.error(e); showMapError(e.message || e); });
                 return;
             }
             ymaps.ready(function () {
@@ -261,7 +275,7 @@
                 showPlacemarks();
                 updateCounter();
              } catch (e) {
-                console.error('Ошибка инициализации карты Яндекс:', e);
+                console.error('Ошибка инициализации карты Яндекс:', e); showMapError(e.message || 'Ошибка инициализации карты');
              }
             });
         }
