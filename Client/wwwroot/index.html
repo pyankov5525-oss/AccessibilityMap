@@ -47,28 +47,43 @@
         var yandexMapsLoading = null;
         function isMobileView() { return window.matchMedia && window.matchMedia('(max-width: 760px)').matches; }
 
+        function waitForYmaps(resolve, reject, sourceName) {
+            var attempts = 0;
+            (function waitYmaps(){
+                if (typeof ymaps !== 'undefined' && typeof ymaps.ready === 'function') return resolve();
+                if (attempts++ > 30) return reject(new Error('Яндекс.Карты загрузились (' + sourceName + '), но API не инициализировался.'));
+                setTimeout(waitYmaps, 200);
+            })();
+        }
+
+        function injectYandexScript(src, sourceName) {
+            return new Promise(function(resolve, reject){
+                var script = document.createElement('script');
+                script.src = src;
+                script.async = true;
+                script.onload = function(){ waitForYmaps(resolve, reject, sourceName); };
+                script.onerror = function(){ reject(new Error('Не удалось загрузить ' + sourceName)); };
+                document.head.appendChild(script);
+            });
+        }
+
         function loadYandexMaps() {
             if (typeof ymaps !== 'undefined' && typeof ymaps.ready === 'function') return Promise.resolve();
             if (yandexMapsLoading) return yandexMapsLoading;
             yandexMapsLoading = fetch('/api/config/yandex-maps-key')
                 .then(function(r){ return r.ok ? r.json() : { apiKey: '' }; })
                 .then(function(cfg){
-                    return new Promise(function(resolve, reject){
-                        var script = document.createElement('script');
-                        var key = cfg && cfg.apiKey ? String(cfg.apiKey) : '';
-                        script.src = 'https://api-maps.yandex.ru/2.1/?' + (key ? ('apikey=' + encodeURIComponent(key) + '&') : '') + 'lang=ru_RU&load=package.full';
-                        script.async = true;
-                        script.onload = function(){
-                            var attempts = 0;
-                            (function waitYmaps(){
-                                if (typeof ymaps !== 'undefined' && typeof ymaps.ready === 'function') return resolve();
-                                if (attempts++ > 30) return reject(new Error('Яндекс.Карты загрузились, но API не инициализировался. Проверьте ключ и ограничения домена.'));
-                                setTimeout(waitYmaps, 200);
-                            })();
-                        };
-                        script.onerror = function(){ reject(new Error('Не удалось загрузить Яндекс.Карты. Проверьте YANDEX_MAPS_API_KEY и ограничения домена.')); };
-                        document.head.appendChild(script);
-                    });
+                    var key = cfg && cfg.apiKey ? String(cfg.apiKey).trim() : '';
+                    var withKey = 'https://api-maps.yandex.ru/2.1/?' + (key ? ('apikey=' + encodeURIComponent(key) + '&') : '') + 'lang=ru_RU&load=package.full';
+                    var withoutKey = 'https://api-maps.yandex.ru/2.1/?lang=ru_RU&load=package.full';
+                    return injectYandexScript(withKey, 'Яндекс.Карты с ключом')
+                        .catch(function(firstError){
+                            console.warn('Yandex Maps with key failed, trying fallback without key', firstError);
+                            return injectYandexScript(withoutKey, 'Яндекс.Карты без ключа')
+                                .catch(function(secondError){
+                                    throw new Error('Не удалось загрузить Яндекс.Карты. Проверьте доступ к api-maps.yandex.ru, ключ YANDEX_MAPS_API_KEY и ограничения домена. Первая ошибка: ' + firstError.message + '. Вторая ошибка: ' + secondError.message);
+                                });
+                        });
                 });
             return yandexMapsLoading;
         }
