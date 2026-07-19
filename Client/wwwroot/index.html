@@ -44,6 +44,7 @@
         var currentCategoryFilter = [];
         var pendingCountForCounter = 0;
         var markerClusterer = null;
+        var mobileObjectManager = null;
         function isMobileView() { return window.matchMedia && window.matchMedia('(max-width: 760px)').matches; }
 
         function setDotNetRef(ref) {
@@ -444,17 +445,56 @@
             map.geoObjects.removeAll();
             placemarkObjects = {};
             markerClusterer = null;
+            mobileObjectManager = null;
             if (!accessibilityMode) { hidePlacemarkPanel(); return; }
 
             var filtered = getVisiblePlacemarks();
             if (!filtered.length) return;
+
+            // На телефоне ObjectManager заметно легче обычного Clusterer при pinch-zoom.
+            if (isMobileView()) {
+                mobileObjectManager = new ymaps.ObjectManager({
+                    clusterize: true,
+                    gridSize: 128,
+                    clusterDisableClickZoom: false,
+                    clusterOpenBalloonOnClick: false,
+                    geoObjectOpenBalloonOnClick: false
+                });
+
+                var features = [];
+                filtered.forEach(function (p) {
+                    var isPending = p.verificationStatus && p.verificationStatus !== 'approved';
+                    var content = buildPlacemarkContent(p);
+                    placemarkObjects[p.id] = { properties: { get: function (k) { return k === 'panelContent' ? content : null; } } };
+                    features.push({
+                        type: 'Feature',
+                        id: p.id,
+                        geometry: { type: 'Point', coordinates: [p.latitude, p.longitude] },
+                        properties: {
+                            hintContent: categoryEmoji(p.category) + ' ' + (p.name || ''),
+                            panelContent: content
+                        },
+                        options: {
+                            preset: isPending ? 'islands#grayIcon' : (p.level === 'green' ? 'islands#greenIcon' : (p.level === 'gold' ? 'islands#yellowIcon' : 'islands#redIcon'))
+                        }
+                    });
+                });
+                mobileObjectManager.add({ type: 'FeatureCollection', features: features });
+                mobileObjectManager.objects.events.add('click', function (e) {
+                    var id = e.get('objectId');
+                    var obj = mobileObjectManager.objects.getById(id);
+                    if (obj && obj.properties) showPlacemarkPanel(obj.properties.panelContent || '');
+                });
+                map.geoObjects.add(mobileObjectManager);
+                return;
+            }
 
             markerClusterer = new ymaps.Clusterer({
                 preset: 'islands#blueClusterIcons',
                 groupByCoordinates: false,
                 clusterDisableClickZoom: false,
                 clusterOpenBalloonOnClick: true,
-                gridSize: isMobileView() ? 96 : 64
+                gridSize: 64
             });
 
             var geoObjects = [];
@@ -468,8 +508,8 @@
                 }, {
                     iconLayout: 'default#image',
                     iconImageHref: 'https://cdn.jsdelivr.net/gh/pointhi/leaflet-color-markers@master/img/marker-icon-2x-' + markerIcon + '.png',
-                    iconImageSize: isMobileView() ? [18, 30] : [22, 36],
-                    iconImageOffset: isMobileView() ? [-9, -30] : [-11, -36],
+                    iconImageSize: [22, 36],
+                    iconImageOffset: [-11, -36],
                     balloonPanelMaxMapArea: 0
                 });
                 pm.events.add('click', function () {
