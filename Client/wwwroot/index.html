@@ -76,12 +76,17 @@
                     var key = cfg && cfg.apiKey ? String(cfg.apiKey).trim() : '';
                     var withKey = 'https://api-maps.yandex.ru/2.1/?' + (key ? ('apikey=' + encodeURIComponent(key) + '&') : '') + 'lang=ru_RU&load=package.full';
                     var withoutKey = 'https://api-maps.yandex.ru/2.1/?lang=ru_RU&load=package.full';
+                    var proxy = '/api/config/yandex-maps-js';
                     return injectYandexScript(withKey, 'Яндекс.Карты с ключом')
                         .catch(function(firstError){
-                            console.warn('Yandex Maps with key failed, trying fallback without key', firstError);
-                            return injectYandexScript(withoutKey, 'Яндекс.Карты без ключа')
-                                .catch(function(secondError){
-                                    throw new Error('Не удалось загрузить Яндекс.Карты. Проверьте доступ к api-maps.yandex.ru, ключ YANDEX_MAPS_API_KEY и ограничения домена. Первая ошибка: ' + firstError.message + '. Вторая ошибка: ' + secondError.message);
+                            console.warn('Yandex Maps direct load failed, trying same-origin proxy', firstError);
+                            return injectYandexScript(proxy, 'Яндекс.Карты через серверный прокси')
+                                .catch(function(proxyError){
+                                    console.warn('Yandex Maps proxy failed, trying fallback without key', proxyError);
+                                    return injectYandexScript(withoutKey, 'Яндекс.Карты без ключа')
+                                        .catch(function(secondError){
+                                            throw new Error('Не удалось загрузить Яндекс.Карты. Прямая загрузка: ' + firstError.message + '. Прокси: ' + proxyError.message + '. Без ключа: ' + secondError.message);
+                                        });
                                 });
                         });
                 });
