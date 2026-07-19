@@ -10,7 +10,6 @@
     <link rel="stylesheet" href="css/app.css" />
     <link rel="stylesheet" href="AccessibilityMap.styles.css" />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-    <script src="https://api-maps.yandex.ru/2.1/?apikey=d803c1da-b012-4e3b-b0f7-72ddf1c0208a&lang=ru_RU&load=package.full" defer></script>
 </head>
 
 <body class="theme-light font-medium">
@@ -45,7 +44,38 @@
         var pendingCountForCounter = 0;
         var markerClusterer = null;
         var mobileObjectManager = null;
+        var yandexMapsLoading = null;
         function isMobileView() { return window.matchMedia && window.matchMedia('(max-width: 760px)').matches; }
+
+        function loadYandexMaps() {
+            if (typeof ymaps !== 'undefined' && typeof ymaps.ready === 'function') return Promise.resolve();
+            if (yandexMapsLoading) return yandexMapsLoading;
+            yandexMapsLoading = fetch('/api/config/yandex-maps-key')
+                .then(function(r){ return r.ok ? r.json() : { apiKey: '' }; })
+                .then(function(cfg){
+                    return new Promise(function(resolve, reject){
+                        var script = document.createElement('script');
+                        var key = cfg && cfg.apiKey ? String(cfg.apiKey) : '';
+                        script.src = 'https://api-maps.yandex.ru/2.1/?' + (key ? ('apikey=' + encodeURIComponent(key) + '&') : '') + 'lang=ru_RU&load=package.full';
+                        script.async = true;
+                        script.onload = function(){ resolve(); };
+                        script.onerror = function(){ reject(new Error('Не удалось загрузить Яндекс.Карты')); };
+                        document.head.appendChild(script);
+                    });
+                });
+            return yandexMapsLoading;
+        }
+
+        function createMapInstance() {
+            var base = { center: [51.672, 39.192], zoom: 12, suppressMapOpenBlock: true };
+            try {
+                base.controls = isMobileView() ? ['zoomControl'] : ['zoomControl', 'typeSelector', 'fullscreenControl'];
+                return new ymaps.Map('map', base);
+            } catch (e) {
+                console.warn('Map controls failed, creating minimal map', e);
+                return new ymaps.Map('map', { center: [51.672, 39.192], zoom: 12, controls: [], suppressMapOpenBlock: true });
+            }
+        }
 
         function setDotNetRef(ref) {
             dotNetRef = ref;
@@ -164,25 +194,13 @@
         function updatePlacemarks(placemarks) {
             placemarksData = placemarks || [];
             if (typeof ymaps === 'undefined' || typeof ymaps.ready !== 'function') {
-                setTimeout(function () { updatePlacemarks(placemarks); }, 400);
+                loadYandexMaps().then(function(){ updatePlacemarks(placemarks); }).catch(function(e){ console.error(e); });
                 return;
             }
             ymaps.ready(function () {
              try {
                 if (!map) {
-                    map = new ymaps.Map("map", {
-                        center: [51.672, 39.192],
-                        zoom: 12,
-                        controls: isMobileView()
-                            ? ['zoomControl']
-                            : [
-                                'zoomControl',
-                                'typeSelector',
-                                'fullscreenControl',
-                                'trafficControl'
-                            ],
-                        suppressMapOpenBlock: true
-                    });
+                    map = createMapInstance();
                     try { map.controls.remove('routeButton'); } catch (e) {}
 
                     var normalText = isMobileView() ? 'Карта' : 'Обычная карта';
@@ -452,7 +470,7 @@
             if (!filtered.length) return;
 
             // На телефоне ObjectManager заметно легче обычного Clusterer при pinch-zoom.
-            if (isMobileView()) {
+            if (isMobileView() && typeof ymaps.ObjectManager === 'function') {
                 mobileObjectManager = new ymaps.ObjectManager({
                     clusterize: true,
                     gridSize: 128,

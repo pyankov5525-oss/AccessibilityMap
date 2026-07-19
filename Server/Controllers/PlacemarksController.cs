@@ -21,16 +21,20 @@ public class PlacemarksController : ControllerBase
     private readonly ILogger<PlacemarksController> _logger;
     private readonly IWebHostEnvironment _env;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly IConfiguration _config;
     private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
-    private const string GeocoderApiKey = "36a55651-ec1b-4152-bbf5-1875ec574586";
+    private string GeocoderApiKey => Environment.GetEnvironmentVariable("YANDEX_GEOCODER_API_KEY")
+                                     ?? _config["Yandex:GeocoderApiKey"]
+                                     ?? string.Empty;
 
-    public PlacemarksController(AppDbContext db, IHttpClientFactory httpClientFactory, ILogger<PlacemarksController> logger, IWebHostEnvironment env, UserManager<ApplicationUser> userManager)
+    public PlacemarksController(AppDbContext db, IHttpClientFactory httpClientFactory, ILogger<PlacemarksController> logger, IWebHostEnvironment env, UserManager<ApplicationUser> userManager, IConfiguration config)
     {
         _db = db;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
         _env = env;
         _userManager = userManager;
+        _config = config;
     }
 
     [HttpGet]
@@ -192,6 +196,7 @@ public class PlacemarksController : ControllerBase
 
         try
         {
+            if (string.IsNullOrWhiteSpace(GeocoderApiKey)) return StatusCode(503, "YANDEX_GEOCODER_API_KEY не задан");
             var url = $"https://geocode-maps.yandex.ru/1.x/?apikey={GeocoderApiKey}&geocode={Uri.EscapeDataString(address)}&format=json";
             var client = _httpClientFactory.CreateClient();
             var json = await client.GetStringAsync(url);
@@ -263,6 +268,7 @@ public class PlacemarksController : ControllerBase
             return Ok(new { items = new List<object>() });
         try
         {
+            if (string.IsNullOrWhiteSpace(GeocoderApiKey)) return Ok(new { items = new List<object>() });
             var url = $"https://geocode-maps.yandex.ru/1.x/?apikey={GeocoderApiKey}&geocode={Uri.EscapeDataString(q)}&format=json&results={limit}";
             var client = _httpClientFactory.CreateClient();
             var json = await client.GetStringAsync(url);
@@ -300,6 +306,7 @@ public class PlacemarksController : ControllerBase
     {
         try
         {
+            if (string.IsNullOrWhiteSpace(GeocoderApiKey)) return Ok(new { address = "Адрес не найден" });
             var url = $"https://geocode-maps.yandex.ru/1.x/?apikey={GeocoderApiKey}&geocode={lon},{lat}&format=json";
             var client = _httpClientFactory.CreateClient();
             var json = await client.GetStringAsync(url);

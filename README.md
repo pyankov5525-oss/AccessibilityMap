@@ -17,7 +17,7 @@
 
 - **Blazor WebAssembly** (клиент) + **ASP.NET Core** (сервер, хостинг WASM)
 - **PostgreSQL** через **Entity Framework Core** (строка из `DATABASE_URL`,
-  например Supabase/Neon). Локально без `DATABASE_URL` — **SQLite** (фоллбэк).
+  например PostgreSQL). Локально без `DATABASE_URL` — **SQLite** (фоллбэк).
 - **ASP.NET Core Identity** + **JWT** (3 роли: Developer / Manager / Volunteer)
 - **Яндекс.Карты 2.1** (JS-interop) + клиентский геокодинг Яндекса
 - CORS — разрешён любой origin (для локальной разработки WASM↔API)
@@ -55,7 +55,7 @@ Swagger API доступен в режиме разработки по `/swagger
 
 - **Локально (SQLite)** — если переменная окружения `DATABASE_URL` не задана,
   используется файл `accessibility.db` (EF Core `EnsureCreated`).
-- **PostgreSQL (Supabase/Neon)** — задайте `DATABASE_URL` (см. ниже), тогда
+- **PostgreSQL (PostgreSQL)** — задайте `DATABASE_URL` (см. ниже), тогда
   используется облачная БД. Строка должна начинаться с `postgresql://` (или
   `postgres://` — код сам поправит) и содержать `sslmode=require` (код добавит
   автоматически, если не указано).
@@ -91,7 +91,7 @@ wwwroot/css/app.css                  # единая тёмная тема
 ### Вариант 1. Render.com (бесплатно, через Docker)
 
 1. Создайте аккаунт на https://render.com и подключите GitHub-репозиторий
-   `pyankov5525-oss/AccessibilityMap`.
+   `OWNER/REPOSITORY`.
 2. New → **Web Service** → выберите репозиторий.
 3. Environment: **Docker** (в репозитории уже есть `Dockerfile`).
 4. Остальное — по умолчанию (план Free).
@@ -102,7 +102,7 @@ wwwroot/css/app.css                  # единая тёмная тема
 Загруженные фото хранятся в файловой системе хоста; на бесплатном тарифе Render
 они сбрасываются при пересборке/перезапуске (демо-данные Воронежа подсеются заново).
 
-### База данных: PostgreSQL на Supabase (бесплатно, навсегда)
+### База данных: PostgreSQL на PostgreSQL (бесплатно, навсегда)
 
 1. Зайдите на https://supabase.com → **Sign up** (через GitHub удобно).
 2. Создайте организацию (например `pyankovOrg`) и проект
@@ -112,7 +112,7 @@ wwwroot/css/app.css                  # единая тёмная тема
    (вкладка URI). Там будет строка вида:
 
    ```
-   postgresql://postgres:ВАШ_ПАРОЛЬ@db.hytnewdmfhddngspxfrq.supabase.co:5432/postgres
+   postgresql://USER:PASSWORD@HOST:5432/DATABASE
    ```
 
 5. Эту строку (с реальным паролем вместо `ВАШ_ПАРОЛЬ`) нужно задать как
@@ -123,7 +123,7 @@ wwwroot/css/app.css                  # единая тёмная тема
    - **Локально (Windows, cmd)** — перед запуском:
 
      ```cmd
-     set DATABASE_URL=postgresql://postgres:ВАШ_ПАРОЛЬ@db.hytnewdmfhddngspxfrq.supabase.co:5432/postgres
+     set DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DATABASE
      dotnet run --project Server
      ```
 

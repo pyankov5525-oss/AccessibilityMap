@@ -168,65 +168,11 @@ static string BuildPostgresConnectionString(string rawConnectionString)
 static async Task SeedRolesAndAdminAsync(IServiceProvider services)
 {
     var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
-    var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
 
     foreach (var role in new[] { "Developer", "Manager", "Volunteer" })
     {
         if (!await roleManager.RoleExistsAsync(role))
             await roleManager.CreateAsync(new IdentityRole(role));
-    }
-
-    const string defaultLogin = "K1ng152";
-    const string defaultPassword = "Text-700";
-
-    // Миграция старого аккаунта «admin» → новый логин (смена логина на уже
-    // развёрнутых базах, где admin уже создан). Выполняется однократно.
-    if (defaultLogin != "admin")
-    {
-        var oldAdmin = await userManager.FindByNameAsync("admin");
-        var newAccount = await userManager.FindByNameAsync(defaultLogin);
-        if (oldAdmin != null && newAccount == null)
-        {
-            oldAdmin.UserName = defaultLogin;
-            oldAdmin.NormalizedUserName = defaultLogin.ToUpperInvariant();
-            if ((await userManager.UpdateAsync(oldAdmin)).Succeeded)
-            {
-                var tok = await userManager.GeneratePasswordResetTokenAsync(oldAdmin);
-                await userManager.ResetPasswordAsync(oldAdmin, tok, defaultPassword);
-                if (!await userManager.IsInRoleAsync(oldAdmin, "Developer"))
-                    await userManager.AddToRoleAsync(oldAdmin, "Developer");
-            }
-        }
-    }
-
-    // Гарантируем постоянный аккаунт разработчика с ФИКСИРОВАННЫМИ данными,
-    // чтобы не приходилось каждый запуск угадывать случайный логин/пароль.
-    // (Если заданы SEED_LOGIN/SEED_PASSWORD — создаётся/сбрасывается они, см. EnsureEnvAdminAsync.)
-    var admin = await userManager.FindByNameAsync(defaultLogin);
-    if (admin == null)
-    {
-        admin = new ApplicationUser
-        {
-            UserName = defaultLogin,
-            EmailConfirmed = true,
-            Status = "active",
-            FullName = "Администратор"
-        };
-        var result = await userManager.CreateAsync(admin, defaultPassword);
-        if (result.Succeeded)
-        {
-            await userManager.AddToRoleAsync(admin, "Developer");
-            Console.WriteLine("==================================================");
-            Console.WriteLine("  АККАУНТ РАЗРАБОТЧИКА (по умолчанию):");
-            Console.WriteLine("  Логин:    K1ng152");
-            Console.WriteLine("  Пароль:   Text-700");
-            Console.WriteLine("  (можно переопределить через SEED_LOGIN/SEED_PASSWORD)");
-            Console.WriteLine("==================================================");
-        }
-    }
-    else if (!await userManager.IsInRoleAsync(admin, "Developer"))
-    {
-        await userManager.AddToRoleAsync(admin, "Developer");
     }
 }
 
@@ -268,6 +214,10 @@ static async Task EnsureUserSchemaAsync(AppDbContext db, bool usePostgres)
             db.Database.ExecuteSqlRaw("CREATE TABLE IF NOT EXISTS Photos (Id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, FileName TEXT NOT NULL UNIQUE, ContentType TEXT NOT NULL, Data BLOB NOT NULL, UploadedAt TEXT NOT NULL);");
             db.Database.ExecuteSqlRaw("CREATE TABLE IF NOT EXISTS PlacemarkVotes (Id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, PlacemarkId INTEGER NOT NULL, VoterKey TEXT NOT NULL, Value INTEGER NOT NULL, CreatedAt TEXT NOT NULL, UpdatedAt TEXT NOT NULL);");
             db.Database.ExecuteSqlRaw("CREATE UNIQUE INDEX IF NOT EXISTS IX_PlacemarkVotes_PlacemarkId_VoterKey ON PlacemarkVotes (PlacemarkId, VoterKey);");
+            db.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_Placemarks_VerificationStatus ON Placemarks (VerificationStatus);");
+            db.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_Placemarks_Category ON Placemarks (Category);");
+            db.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_ActivityLogs_UserName ON ActivityLogs (UserName);");
+            db.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_ActivityLogs_Timestamp ON ActivityLogs (Timestamp);");
         }
     }
     catch { }
@@ -311,7 +261,7 @@ static async Task EnsureEnvAdminAsync(IServiceProvider services)
     var user = await userManager.FindByNameAsync(login);
     if (user == null)
     {
-        user = new ApplicationUser { UserName = login, EmailConfirmed = true };
+        user = new ApplicationUser { UserName = login, EmailConfirmed = true, Status = "active", FullName = "Разработчик" };
         var result = await userManager.CreateAsync(user, password);
         if (result.Succeeded)
         {
