@@ -1,0 +1,18 @@
+#cloud-config
+# Базовая подготовка Ubuntu VM. Сетевой доступ к 5432 ограничивается отдельно
+# группой безопасности Cloud.ru: только подсеть приложения и административный IP.
+package_update: true
+packages:
+  - docker.io
+  - docker-compose-v2
+  - postgresql-client
+  - ufw
+runcmd:
+  - systemctl enable --now docker
+  - mkdir -p /opt/accessibilitymap/postgres/secrets /opt/accessibilitymap/postgres/backups
+  - chmod 700 /opt/accessibilitymap/postgres/secrets /opt/accessibilitymap/postgres/backups
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow OpenSSH
+  - ufw --force enable
+final_message: "VM prepared. Copy deploy/cloudru/postgres files and configure the Cloud.ru security group before starting PostgreSQL."

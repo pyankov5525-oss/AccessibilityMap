@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using AccessibilityMap.Server.Data;
 using AccessibilityMap.Server.Models;
+using AccessibilityMap.Server.Services;
 using Microsoft.Extensions.Http;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Authorization;
@@ -22,12 +23,13 @@ public class PlacemarksController : ControllerBase
     private readonly IWebHostEnvironment _env;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IConfiguration _config;
+    private readonly PhotoObjectStorage _photoStorage;
     private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
     private string GeocoderApiKey => Environment.GetEnvironmentVariable("YANDEX_GEOCODER_API_KEY")
                                      ?? _config["Yandex:GeocoderApiKey"]
                                      ?? string.Empty;
 
-    public PlacemarksController(AppDbContext db, IHttpClientFactory httpClientFactory, ILogger<PlacemarksController> logger, IWebHostEnvironment env, UserManager<ApplicationUser> userManager, IConfiguration config)
+    public PlacemarksController(AppDbContext db, IHttpClientFactory httpClientFactory, ILogger<PlacemarksController> logger, IWebHostEnvironment env, UserManager<ApplicationUser> userManager, IConfiguration config, PhotoObjectStorage photoStorage)
     {
         _db = db;
         _httpClientFactory = httpClientFactory;
@@ -35,6 +37,7 @@ public class PlacemarksController : ControllerBase
         _env = env;
         _userManager = userManager;
         _config = config;
+        _photoStorage = photoStorage;
     }
 
     [HttpGet]
@@ -389,14 +392,40 @@ public class PlacemarksController : ControllerBase
 
         try
         {
-            _db.Photos.Add(new PhotoModel
+            var photo = new PhotoModel
             {
                 FileName = fileName,
                 ContentType = detected.Value.ContentType,
                 Data = bytes,
                 UploadedAt = DateTime.UtcNow
-            });
+            };
+            _db.Photos.Add(photo);
             await _db.SaveChangesAsync();
+
+            // New photos go to Object Storage when configured. Keep the database
+            // bytes only if the upload fails, so an S3 incident cannot lose data.
+            if (_photoStorage.IsConfigured)
+            {
+                try
+                {
+                    await _photoStorage.PutAsync(fileName, photo.ContentType, bytes, HttpContext.RequestAborted);
+                    photo.Data = Array.Empty<byte>();
+                    try
+                    {
+                        await _db.SaveChangesAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        // The initial DB copy is already durable. Duplicate storage is
+                        // safe and can be cleaned only after a later checksum audit.
+                        _logger.LogWarning(ex, "S3 contains {FileName}, but its database BLOB could not be cleared", fileName);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "S3 upload failed for {FileName}; the database copy was retained", fileName);
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -431,8 +460,16 @@ public class PlacemarksController : ControllerBase
             Response.Headers["Cache-Control"] = "private,max-age=300";
         }
 
+        if (_photoStorage.IsConfigured)
+        {
+            var storedPhoto = await _photoStorage.GetAsync(fileName, HttpContext.RequestAborted);
+            if (storedPhoto is not null)
+                return File(storedPhoto.Data, storedPhoto.ContentType);
+        }
+
+        // Read fallback for photos not migrated yet or retained after a failed S3 upload.
         var dbPhoto = await _db.Photos.AsNoTracking().FirstOrDefaultAsync(p => p.FileName == fileName);
-        if (dbPhoto != null)
+        if (dbPhoto is { Data.Length: > 0 })
             return File(dbPhoto.Data, dbPhoto.ContentType);
 
         // fallback для старых локальных файлов, если они ещё есть на диске

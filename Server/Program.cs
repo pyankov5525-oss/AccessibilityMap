@@ -11,14 +11,19 @@ using System.Text;
 using AccessibilityMap.Server;
 using AccessibilityMap.Server.Data;
 using AccessibilityMap.Server.Models;
+using AccessibilityMap.Server.Services;
 
-var builder = WebApplication.CreateBuilder(args);
+var migratePhotosOnly = args.Contains("--migrate-photos-to-s3", StringComparer.OrdinalIgnoreCase);
+var builderArgs = args.Where(arg => !string.Equals(arg, "--migrate-photos-to-s3", StringComparison.OrdinalIgnoreCase)).ToArray();
+var builder = WebApplication.CreateBuilder(builderArgs);
 
 // База: PostgreSQL (переменная DATABASE_URL от Supabase/Neon) либо локальный SQLite для разработки
 var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
                        ?? builder.Configuration.GetConnectionString("Default");
 var usePostgres = !string.IsNullOrEmpty(connectionString)
                   && connectionString.Contains("postgres", StringComparison.OrdinalIgnoreCase);
+var requirePostgresSsl = !string.Equals(
+    Environment.GetEnvironmentVariable("POSTGRES_REQUIRE_SSL"), "false", StringComparison.OrdinalIgnoreCase);
 if (!usePostgres)
 {
     connectionString = "Data Source=accessibility.db";
@@ -28,7 +33,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 {
     if (usePostgres)
     {
-        var pgConnectionString = BuildPostgresConnectionString(connectionString!);
+        var pgConnectionString = BuildPostgresConnectionString(connectionString!, requirePostgresSsl);
         options.UseNpgsql(pgConnectionString);
     }
     else
@@ -98,6 +103,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddHttpClient();
 builder.Services.AddHealthChecks();
 builder.Services.AddResponseCompression(options => options.EnableForHttps = true);
+builder.Services.AddSingleton<PhotoObjectStorage>();
 builder.Services.AddHostedService<PlacemarkCleanupService>();
 
 // Hosted WASM обращается к API с того же origin. Дополнительные origin разрешаются
@@ -188,14 +194,30 @@ using (var scope = app.Services.CreateScope())
     await SeedRolesAndAdminAsync(services);
     // Известный аккаунт разработчика через переменные окружения (восстановление доступа)
     await EnsureEnvAdminAsync(services);
+
+    if (migratePhotosOnly)
+    {
+        var storage = services.GetRequiredService<PhotoObjectStorage>();
+        if (!storage.IsConfigured)
+            throw new InvalidOperationException("Для миграции фотографий задайте все переменные S3__*");
+
+        var migrated = await storage.MigrateFromDatabaseAsync(db);
+        var (verified, failed) = await storage.VerifyDatabaseCopiesAsync(db);
+        Console.WriteLine($"S3 migration completed: uploaded={migrated}, verified={verified}, failed={failed}");
+        if (failed > 0)
+            throw new InvalidOperationException($"Проверка S3 не пройдена для {failed} фотографий. BLOB в БД не изменены.");
+    }
 }
+
+if (migratePhotosOnly)
+    return;
 
 app.Run();
 
 
-static string BuildPostgresConnectionString(string rawConnectionString)
+static string BuildPostgresConnectionString(string rawConnectionString, bool requireSsl)
 {
-    // Render/Supabase часто дают строку в URI-формате:
+    // Облачные провайдеры часто дают строку в URI-формате:
     // postgresql://postgres:password@db.xxxxx.supabase.co:5432/postgres
     // NpgsqlConnectionStringBuilder НЕ понимает такой формат напрямую,
     // поэтому аккуратно переводим URI в обычный формат Host=...;Username=...
@@ -215,7 +237,7 @@ static string BuildPostgresConnectionString(string rawConnectionString)
             Database = string.IsNullOrWhiteSpace(database) ? "postgres" : Uri.UnescapeDataString(database),
             Username = username,
             Password = password,
-            SslMode = SslMode.Require,
+            SslMode = requireSsl ? SslMode.Require : SslMode.Disable,
             Pooling = true
         };
 
@@ -224,10 +246,7 @@ static string BuildPostgresConnectionString(string rawConnectionString)
 
     // Если строка уже в формате Npgsql: Host=...;Database=...;Username=...
     var pgBuilder = new NpgsqlConnectionStringBuilder(rawConnectionString);
-    if (pgBuilder.SslMode == SslMode.Prefer || pgBuilder.SslMode == SslMode.Disable)
-    {
-        pgBuilder.SslMode = SslMode.Require;
-    }
+    pgBuilder.SslMode = requireSsl ? SslMode.Require : SslMode.Disable;
 
     return pgBuilder.ConnectionString;
 }

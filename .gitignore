@@ -13,6 +13,14 @@ obj/
 Server/uploads/
 **/uploads/
 
+# Cloud.ru deployment secrets and database dumps
+**/secrets/
+**/backups/
+migration-backups/
+*.dump
+*.dump.sha256
+.env
+
 # Rider / VS
 .idea/
 .vs/
