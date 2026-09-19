@@ -1,0 +1,73 @@
+name: Authorized Render load test
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: Owned Render service URL
+        required: true
+        default: https://accessibilitymap-5deb.onrender.com
+      max_stage:
+        description: Highest concurrent-user stage
+        required: true
+        type: choice
+        options: ['1', '10', '100', '1000']
+        default: '1000'
+
+permissions:
+  contents: read
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Render target ownership boundary
+        env:
+          TARGET_URL: ${{ inputs.target_url }}
+        run: |
+          case "$TARGET_URL" in
+            https://accessibilitymap-5deb.onrender.com|https://accessibilitymap-5deb.onrender.com/) ;;
+            *) echo 'Target is not the explicitly authorized Render service' >&2; exit 1 ;;
+          esac
+      - name: Install k6
+        run: |
+          curl -fsSL https://github.com/grafana/k6/releases/download/v2.2.0/k6-v2.2.0-linux-amd64.tar.gz -o /tmp/k6.tgz
+          tar -xzf /tmp/k6.tgz -C /tmp
+          sudo install /tmp/k6-v2.2.0-linux-amd64/k6 /usr/local/bin/k6
+      - name: Warm up service
+        env:
+          TARGET_URL: ${{ inputs.target_url }}
+        run: curl --fail --show-error --silent --retry 5 --retry-all-errors --retry-delay 10 --max-time 120 "$TARGET_URL/health"
+      - name: 1 concurrent user
+        env:
+          TARGET_URL: ${{ inputs.target_url }}
+          LOAD_STAGE: '1'
+        run: k6 run --summary-export=load-1.json tests/load/read-only.js
+      - name: 10 concurrent users
+        if: ${{ inputs.max_stage == '10' || inputs.max_stage == '100' || inputs.max_stage == '1000' }}
+        env:
+          TARGET_URL: ${{ inputs.target_url }}
+          LOAD_STAGE: '10'
+        run: k6 run --summary-export=load-10.json tests/load/read-only.js
+      - name: 100 concurrent users
+        if: ${{ inputs.max_stage == '100' || inputs.max_stage == '1000' }}
+        env:
+          TARGET_URL: ${{ inputs.target_url }}
+          LOAD_STAGE: '100'
+        run: k6 run --summary-export=load-100.json tests/load/read-only.js
+      - name: 1000 concurrent users
+        if: ${{ inputs.max_stage == '1000' }}
+        env:
+          TARGET_URL: ${{ inputs.target_url }}
+          LOAD_STAGE: '1000'
+        run: k6 run --summary-export=load-1000.json tests/load/read-only.js
+      - name: Upload machine-readable results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: authorized-load-test-results
+          path: load-*.json
+          if-no-files-found: warn
+          retention-days: 14
