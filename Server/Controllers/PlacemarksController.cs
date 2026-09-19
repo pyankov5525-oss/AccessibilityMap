@@ -39,14 +39,29 @@ public class PlacemarksController : ControllerBase
 
     [HttpGet]
     [AllowAnonymous]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll(
+        [FromQuery] double? minLat = null, [FromQuery] double? minLon = null,
+        [FromQuery] double? maxLat = null, [FromQuery] double? maxLon = null)
     {
-        IQueryable<PlacemarkModel> query = _db.Placemarks;
+        IQueryable<PlacemarkModel> query = _db.Placemarks.AsNoTracking();
         // Гость видит только approved. Любой вошедший пользователь видит также pending,
         // чтобы волонтёры не ставили дубли и понимали, что объект уже на проверке.
         if (User.Identity?.IsAuthenticated != true)
             query = query.Where(p => p.VerificationStatus == "approved");
-        var placemarks = await query.ToListAsync();
+
+        // Необязательная выборка по видимой области уже готова для следующего этапа
+        // масштабирования; старый клиент без параметров остаётся совместимым.
+        if (minLat.HasValue && minLon.HasValue && maxLat.HasValue && maxLon.HasValue)
+        {
+            if (minLat > maxLat || minLon > maxLon) return BadRequest(new { error = "Некорректные границы карты" });
+            var south = minLat.Value;
+            var west = minLon.Value;
+            var north = maxLat.Value;
+            var east = maxLon.Value;
+            query = query.Where(p => p.Latitude >= south && p.Latitude <= north && p.Longitude >= west && p.Longitude <= east);
+        }
+
+        var placemarks = await query.OrderByDescending(p => p.CreatedAt).Take(10_000).ToListAsync();
         return Ok(placemarks.Select(ToDto).ToList());
     }
 
@@ -125,6 +140,17 @@ public class PlacemarksController : ControllerBase
         if (string.IsNullOrWhiteSpace(user.FullName) || string.IsNullOrWhiteSpace(user.DateOfBirth))
             return BadRequest(new { error = "Заполните ФИО и дату рождения в профиле, чтобы добавлять метки" });
 
+        var allowedCategories = new[] { "Поликлиника", "Аптека", "Магазин", "Администрация", "Культура", "Образование", "Другое" };
+        if (!allowedCategories.Contains(placemark.Category))
+            return BadRequest(new { error = "Недопустимая категория" });
+        if (placemark.Latitude == 0 && placemark.Longitude == 0)
+            return BadRequest(new { error = "Не указано положение объекта на карте" });
+
+        placemark.Name = placemark.Name.Trim();
+        placemark.Address = placemark.Address.Trim();
+        placemark.Notes = placemark.Notes?.Trim() ?? string.Empty;
+        placemark.Likes = 0;
+        placemark.Dislikes = 0;
         placemark.CreatedAt = DateTime.UtcNow;
         // Обязательная модерация: новые метки появляются на публичной карте
         // только после одобрения управляющим/разработчиком (verificationStatus=approved).
@@ -349,24 +375,25 @@ public class PlacemarksController : ControllerBase
             return BadRequest(new { error = "Фото слишком большое (максимум 5 МБ)" });
         }
 
-        var allowed = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
-        var ext = Path.GetExtension(file.FileName);
-        if (!allowed.Contains(ext, StringComparer.OrdinalIgnoreCase))
-        {
-            return BadRequest(new { error = "Недопустимый тип файла (только изображения)" });
-        }
-
-        var fileName = Guid.NewGuid().ToString("N") + ext.ToLowerInvariant();
         await using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
+        var bytes = ms.ToArray();
+        var detected = DetectImageType(bytes);
+        if (detected is null)
+        {
+            return BadRequest(new { error = "Содержимое файла не является поддерживаемым изображением (JPEG, PNG, GIF или WebP)" });
+        }
+
+        // Имя и MIME формируются по сигнатуре содержимого, а не по присланному имени.
+        var fileName = Guid.NewGuid().ToString("N") + detected.Value.Extension;
 
         try
         {
             _db.Photos.Add(new PhotoModel
             {
                 FileName = fileName,
-                ContentType = GetContentType(fileName),
-                Data = ms.ToArray(),
+                ContentType = detected.Value.ContentType,
+                Data = bytes,
                 UploadedAt = DateTime.UtcNow
             });
             await _db.SaveChangesAsync();
@@ -382,15 +409,29 @@ public class PlacemarksController : ControllerBase
 
     [HttpGet("/api/photos/{fileName}")]
     [AllowAnonymous]
-    public IActionResult GetPhoto(string fileName)
+    public async Task<IActionResult> GetPhoto(string fileName)
     {
         fileName = Path.GetFileName(fileName);
         if (string.IsNullOrWhiteSpace(fileName))
-        {
             return BadRequest(new { error = "Некорректное имя файла" });
+
+        // Неодобренные вложения доступны только вошедшим участникам. Гость не может
+        // получить скрытую фотографию, просто угадав URL из истории или логов.
+        var isAuthenticated = User.Identity?.IsAuthenticated == true;
+        if (!isAuthenticated)
+        {
+            var isPublic = await _db.Placemarks.AnyAsync(p =>
+                p.VerificationStatus == "approved" &&
+                (p.PhotoPath == fileName || (p.PhotoPaths != null && p.PhotoPaths.Contains(fileName))));
+            if (!isPublic) return NotFound();
+            Response.Headers["Cache-Control"] = "public,max-age=86400";
+        }
+        else
+        {
+            Response.Headers["Cache-Control"] = "private,max-age=300";
         }
 
-        var dbPhoto = _db.Photos.FirstOrDefault(p => p.FileName == fileName);
+        var dbPhoto = await _db.Photos.AsNoTracking().FirstOrDefaultAsync(p => p.FileName == fileName);
         if (dbPhoto != null)
             return File(dbPhoto.Data, dbPhoto.ContentType);
 
@@ -403,6 +444,18 @@ public class PlacemarksController : ControllerBase
         return PhysicalFile(fullPath, GetContentType(fileName));
     }
 
+    private static (string Extension, string ContentType)? DetectImageType(byte[] data)
+    {
+        if (data.Length >= 3 && data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF)
+            return (".jpg", "image/jpeg");
+        if (data.Length >= 8 && data.AsSpan(0, 8).SequenceEqual(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }))
+            return (".png", "image/png");
+        if (data.Length >= 6 && (System.Text.Encoding.ASCII.GetString(data, 0, 6) is "GIF87a" or "GIF89a"))
+            return (".gif", "image/gif");
+        if (data.Length >= 12 && System.Text.Encoding.ASCII.GetString(data, 0, 4) == "RIFF" && System.Text.Encoding.ASCII.GetString(data, 8, 4) == "WEBP")
+            return (".webp", "image/webp");
+        return null;
+    }
 
     private static string GetContentType(string fileName)
     {

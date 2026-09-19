@@ -6,6 +6,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using AccessibilityMap.Server.Data;
 using AccessibilityMap.Server.Models;
 
@@ -68,7 +69,9 @@ public class AuthController : ControllerBase
             return Unauthorized(new { error = "Неверный ответ на проверку (капча)" });
         }
 
-        var result = await _signInManager.CheckPasswordSignInAsync(user, model.Password, false);
+        var result = await _signInManager.CheckPasswordSignInAsync(user, model.Password, lockoutOnFailure: true);
+        if (result.IsLockedOut)
+            return Unauthorized(new { error = "Слишком много неудачных попыток. Вход временно заблокирован на 15 минут" });
         if (!result.Succeeded)
             return Unauthorized(new { error = "Неверный логин или пароль" });
 
@@ -134,6 +137,11 @@ public class AuthController : ControllerBase
     private async Task<IActionResult> CreateUser(string role, string fullName, string dateOfBirth)
     {
         var login = GenerateLogin();
+        for (var attempt = 0; attempt < 20 && await _userManager.FindByNameAsync(login) != null; attempt++)
+            login = GenerateLogin();
+        if (await _userManager.FindByNameAsync(login) != null)
+            return StatusCode(503, new { error = "Не удалось подобрать свободный логин. Повторите попытку" });
+
         var password = GeneratePassword();
         var user = new ApplicationUser
         {
@@ -410,13 +418,20 @@ public class AuthController : ControllerBase
     // ===== Капча (защита входа от ботов) =====
     private static readonly ConcurrentDictionary<string, (string Answer, DateTime Expiry)> _captchas = new();
 
+    private static void CleanupExpiredCaptchas()
+    {
+        var now = DateTime.UtcNow;
+        foreach (var item in _captchas.Where(x => x.Value.Expiry < now).Take(100))
+            _captchas.TryRemove(item.Key, out _);
+    }
+
     [HttpGet("captcha")]
     [AllowAnonymous]
     public IActionResult GetCaptcha()
     {
-        var rnd = new Random();
-        var a = rnd.Next(1, 10);
-        var b = rnd.Next(1, 10);
+        CleanupExpiredCaptchas();
+        var a = RandomNumberGenerator.GetInt32(1, 10);
+        var b = RandomNumberGenerator.GetInt32(1, 10);
         var token = Guid.NewGuid().ToString("N");
         _captchas[token] = ((a + b).ToString(), DateTime.UtcNow.AddMinutes(5));
         return Ok(new { token, question = $"Сколько будет {a} + {b}?" });
@@ -429,8 +444,8 @@ public class AuthController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(model.Login) || string.IsNullOrWhiteSpace(model.Password))
             return BadRequest(new { error = "Укажите логин и пароль" });
-        if (model.Password.Length < 6)
-            return BadRequest(new { error = "Пароль должен быть не короче 6 символов" });
+        if (model.Password.Length < 10 || !model.Password.Any(char.IsLetter) || !model.Password.Any(char.IsDigit))
+            return BadRequest(new { error = "Пароль должен содержать не менее 10 символов, буквы и цифры" });
         var validation = ValidateProfileRequired(model.FullName, model.DateOfBirth);
         if (validation != null) return validation;
 
@@ -548,7 +563,10 @@ public class AuthController : ControllerBase
 
     private string GenerateToken(ApplicationUser user, IList<string> roles)
     {
-        var key = _config["Jwt:Key"] ?? "accessibility-map-dev-secret-key-1234567890";
+        var key = _config["Jwt:Key"]
+                  ?? throw new InvalidOperationException("JWT key is not configured");
+        var issuer = _config["Jwt:Issuer"] ?? "AccessibilityMap";
+        var audience = _config["Jwt:Audience"] ?? "AccessibilityMap.Client";
         var claims = new List<Claim>
         {
             // NameIdentifier обязателен: UserManager.GetUserAsync(User) ищет
@@ -565,8 +583,11 @@ public class AuthController : ControllerBase
             SecurityAlgorithms.HmacSha256);
 
         var token = new JwtSecurityToken(
+            issuer: issuer,
+            audience: audience,
             claims: claims,
-            expires: DateTime.UtcNow.AddDays(30),
+            notBefore: DateTime.UtcNow,
+            expires: DateTime.UtcNow.AddHours(8),
             signingCredentials: creds);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
@@ -575,14 +596,29 @@ public class AuthController : ControllerBase
     private static string GenerateLogin()
     {
         const string chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-        var rnd = new Random();
-        return new string(Enumerable.Repeat(chars, 5).Select(c => c[rnd.Next(c.Length)]).ToArray());
+        return RandomString(chars, 5);
     }
 
     private static string GeneratePassword()
     {
-        const string chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-        var rnd = new Random();
-        return new string(Enumerable.Repeat(chars, 10).Select(c => c[rnd.Next(c.Length)]).ToArray());
+        const string letters = "abcdefghijkmnopqrstuvwxyz";
+        const string digits = "23456789";
+        const string all = letters + digits;
+        // Гарантируем соответствие политике Identity: хотя бы одна буква и цифра.
+        var chars = (RandomString(letters, 1) + RandomString(digits, 1) + RandomString(all, 10)).ToCharArray();
+        for (var i = chars.Length - 1; i > 0; i--)
+        {
+            var j = RandomNumberGenerator.GetInt32(i + 1);
+            (chars[i], chars[j]) = (chars[j], chars[i]);
+        }
+        return new string(chars);
+    }
+
+    private static string RandomString(string alphabet, int length)
+    {
+        var result = new char[length];
+        for (var i = 0; i < result.Length; i++)
+            result[i] = alphabet[RandomNumberGenerator.GetInt32(alphabet.Length)];
+        return new string(result);
     }
 }

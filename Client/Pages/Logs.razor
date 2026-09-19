@@ -5,10 +5,10 @@
 <h3>Журнал действий всех пользователей</h3>
 
 <div class="subtabs">
-    <button class="subtab @(tab == "all" ? "subtab-active" : "")" @onclick="@(() => SetTab("all"))">Все</button>
-    <button class="subtab @(tab == "login" ? "subtab-active" : "")" @onclick="@(() => SetTab("login"))">Входы</button>
-    <button class="subtab @(tab == "placemark" ? "subtab-active" : "")" @onclick="@(() => SetTab("placemark"))">Постановка меток</button>
-    <button class="subtab @(tab == "action" ? "subtab-active" : "")" @onclick="@(() => SetTab("action"))">Действия</button>
+    <button type="button" class="subtab @(tab == "all" ? "subtab-active" : "")" @onclick="@(() => SetTab("all"))">Все</button>
+    <button type="button" class="subtab @(tab == "login" ? "subtab-active" : "")" @onclick="@(() => SetTab("login"))">Входы</button>
+    <button type="button" class="subtab @(tab == "placemark" ? "subtab-active" : "")" @onclick="@(() => SetTab("placemark"))">Постановка меток</button>
+    <button type="button" class="subtab @(tab == "action" ? "subtab-active" : "")" @onclick="@(() => SetTab("action"))">Действия</button>
 </div>
 
 <div class="toolbar" style="margin-bottom:12px;">

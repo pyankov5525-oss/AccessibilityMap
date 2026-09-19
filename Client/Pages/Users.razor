@@ -17,8 +17,8 @@
 @if (Auth.Role == "Developer" || Auth.Role == "Manager")
 {
     <div class="user-actions-panel">
-        <button class="btn btn-primary" @onclick="OpenManualCreate">Создать профиль</button>
-        <button class="btn btn-secondary" @onclick="OpenAutoCreate">Сгенерировать логин/пароль</button>
+        <button type="button" class="btn btn-primary" @onclick="OpenManualCreate">Создать профиль</button>
+        <button type="button" class="btn btn-secondary" @onclick="OpenAutoCreate">Сгенерировать логин/пароль</button>
     </div>
 }
 else
@@ -52,7 +52,7 @@ else
         <div class="modal-card-custom">
             <div class="detail-head">
                 <h4>@(createMode == "manual" ? "Создать профиль вручную" : "Сгенерировать логин и пароль")</h4>
-                <button class="btn btn-sm btn-secondary" @onclick="CloseCreateWindow">Закрыть</button>
+                <button type="button" class="btn btn-sm btn-secondary" @onclick="CloseCreateWindow">Закрыть</button>
             </div>
 
             <p class="muted">
@@ -101,10 +101,10 @@ else
             }
 
             <div class="form-actions">
-                <button class="btn btn-success" @onclick="CreateAccount">
+                <button type="button" class="btn btn-success" @onclick="CreateAccount">
                     @(createMode == "manual" ? "Создать профиль" : "Сгенерировать и создать")
                 </button>
-                <button class="btn btn-secondary" @onclick="CloseCreateWindow">Отмена</button>
+                <button type="button" class="btn btn-secondary" @onclick="CloseCreateWindow">Отмена</button>
             </div>
         </div>
     </div>
@@ -118,13 +118,13 @@ else if (Auth.Role == "Developer" || Auth.Role == "Manager")
 {
     <div class="page">
         <div class="subtabs">
-            <button class="subtab @(activeTab == "all" ? "subtab-active" : "")" @onclick="@(() => SetTab("all"))">Все (@VisibleUsers.Count)</button>
+            <button type="button" class="subtab @(activeTab == "all" ? "subtab-active" : "")" @onclick="@(() => SetTab("all"))">Все (@VisibleUsers.Count)</button>
             @if (Auth.Role == "Developer")
             {
-                <button class="subtab @(activeTab == "Developer" ? "subtab-active" : "")" @onclick="@(() => SetTab("Developer"))">Разработчики (@CountRole("Developer"))</button>
-                <button class="subtab @(activeTab == "Manager" ? "subtab-active" : "")" @onclick="@(() => SetTab("Manager"))">Управляющие (@CountRole("Manager"))</button>
+                <button type="button" class="subtab @(activeTab == "Developer" ? "subtab-active" : "")" @onclick="@(() => SetTab("Developer"))">Разработчики (@CountRole("Developer"))</button>
+                <button type="button" class="subtab @(activeTab == "Manager" ? "subtab-active" : "")" @onclick="@(() => SetTab("Manager"))">Управляющие (@CountRole("Manager"))</button>
             }
-            <button class="subtab @(activeTab == "Volunteer" ? "subtab-active" : "")" @onclick="@(() => SetTab("Volunteer"))">Волонтёры (@CountRole("Volunteer"))</button>
+            <button type="button" class="subtab @(activeTab == "Volunteer" ? "subtab-active" : "")" @onclick="@(() => SetTab("Volunteer"))">Волонтёры (@CountRole("Volunteer"))</button>
         </div>
 
         <div class="toolbar users-filter-bar">
@@ -184,10 +184,10 @@ else if (Auth.Role == "Developer" || Auth.Role == "Manager")
                     </td>
                     <td>@StatusRu(u.Status)</td>
                     <td class="row-actions">
-                        <button class="btn btn-sm btn-info" @onclick="() => ViewProfile(u.Id)">Профиль</button>
+                        <button type="button" class="btn btn-sm btn-info" @onclick="() => ViewProfile(u.Id)">Профиль</button>
                     </td>
                     <td class="row-actions">
-                        <button class="btn btn-sm @(u.Status == "blocked" ? "btn-success" : "btn-danger")" disabled="@(!CanDeleteUser(u, isSelf))" @onclick="() => DeleteUser(u.Id)">@(u.Status == "blocked" ? "Разблокировать" : "Блокировать")</button>
+                        <button type="button" class="btn btn-sm @(u.Status == "blocked" ? "btn-success" : "btn-danger")" disabled="@(!CanDeleteUser(u, isSelf))" @onclick="() => DeleteUser(u.Id)">@(u.Status == "blocked" ? "Разблокировать" : "Блокировать")</button>
                     </td>
                 </tr>
             }

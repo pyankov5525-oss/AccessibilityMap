@@ -6,7 +6,7 @@
 
 <div class="topbar">
     <a class="brand" href="" @onclick="ClosePanels">♿ Город без барьеров</a>
-    <nav class="nav-links">
+    <nav class="nav-links" aria-label="Основная навигация">
         <NavLink class="nav-link" href="" Match="NavLinkMatch.All" @onclick="ClosePanels">Карта</NavLink>
         @if (Auth.IsAuthenticated)
         {
@@ -37,7 +37,7 @@
         @if (Auth.IsAuthenticated)
         {
             <span class="muted">@Auth.UserName · @RoleRu</span>
-            <button class="btn btn-sm btn-secondary" @onclick="Logout">Выйти</button>
+            <button type="button" class="btn btn-sm btn-secondary" @onclick="Logout">Выйти</button>
         }
         else
         {
@@ -48,17 +48,17 @@
     <div class="ui-controls">
         <div class="ui-control-block">
             <div class="ui-control-label">Цветовая тема</div>
-            <div class="theme-switch" title="Цветовая тема">
-                <button class="theme-btn @(theme == "light" ? "active" : "")" @onclick='@(() => SetTheme("light"))'>☀️</button>
-                <button class="theme-btn @(theme == "dark" ? "active" : "")" @onclick='@(() => SetTheme("dark"))'>🌙</button>
+            <div class="theme-switch" role="group" aria-label="Цветовая тема">
+                <button type="button" class="theme-btn @(theme == "light" ? "active" : "")" aria-label="Светлая тема" aria-pressed="@(theme == "light")" title="Светлая тема" @onclick='@(() => SetTheme("light"))'>☀️</button>
+                <button type="button" class="theme-btn @(theme == "dark" ? "active" : "")" aria-label="Тёмная тема" aria-pressed="@(theme == "dark")" title="Тёмная тема" @onclick='@(() => SetTheme("dark"))'>🌙</button>
             </div>
         </div>
         <div class="ui-control-block">
             <div class="ui-control-label">Шрифт</div>
-            <div class="font-switch" title="Шрифт">
-                <button class="font-btn @(fontSize == "small" ? "active" : "")" @onclick='@(() => SetFont("small"))'>Мал</button>
-                <button class="font-btn @(fontSize == "medium" ? "active" : "")" @onclick='@(() => SetFont("medium"))'>Сред</button>
-                <button class="font-btn @(fontSize == "large" ? "active" : "")" @onclick='@(() => SetFont("large"))'>Больш</button>
+            <div class="font-switch" role="group" aria-label="Размер шрифта">
+                <button type="button" class="font-btn @(fontSize == "small" ? "active" : "")" aria-pressed="@(fontSize == "small")" title="Малый шрифт — 12 пикселей" @onclick='@(() => SetFont("small"))'>12</button>
+                <button type="button" class="font-btn @(fontSize == "medium" ? "active" : "")" aria-pressed="@(fontSize == "medium")" title="Средний шрифт — 14 пикселей" @onclick='@(() => SetFont("medium"))'>14</button>
+                <button type="button" class="font-btn @(fontSize == "large" ? "active" : "")" aria-pressed="@(fontSize == "large")" title="Большой шрифт — 18 пикселей" @onclick='@(() => SetFont("large"))'>18</button>
             </div>
         </div>
     </div>

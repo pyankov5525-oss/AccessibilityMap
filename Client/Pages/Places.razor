@@ -14,10 +14,10 @@
 
     <div class="toolbar">
         <div class="filters">
-            <button class="chip @(filter == "all" ? "chip-active" : "")" @onclick="@(() => SetFilter("all"))">Все</button>
-            <button class="chip chip-green @(filter == "green" ? "chip-active" : "")" @onclick="@(() => SetFilter("green"))">🟢 Доступно</button>
-            <button class="chip chip-gold @(filter == "gold" ? "chip-active" : "")" @onclick="@(() => SetFilter("gold"))">🟡 Частично</button>
-            <button class="chip chip-red @(filter == "red" ? "chip-active" : "")" @onclick="@(() => SetFilter("red"))">🔴 Недоступно</button>
+            <button type="button" class="chip @(filter == "all" ? "chip-active" : "")" @onclick="@(() => SetFilter("all"))">Все</button>
+            <button type="button" class="chip chip-green @(filter == "green" ? "chip-active" : "")" @onclick="@(() => SetFilter("green"))">🟢 Доступно</button>
+            <button type="button" class="chip chip-gold @(filter == "gold" ? "chip-active" : "")" @onclick="@(() => SetFilter("gold"))">🟡 Частично</button>
+            <button type="button" class="chip chip-red @(filter == "red" ? "chip-active" : "")" @onclick="@(() => SetFilter("red"))">🔴 Недоступно</button>
         </div>
         <input class="form-control search-box" placeholder="Поиск по названию или адресу..."
                value="@search" @oninput="OnSearchInput" />
@@ -59,8 +59,8 @@
                         @if (CanManagePlacemarks)
                         {
                             <td class="row-actions">
-                                <button class="btn btn-sm btn-secondary" @onclick="@(() => Edit(p.Id))">Изменить</button>
-                                <button class="btn btn-sm btn-danger" @onclick="@(() => Delete(p.Id))">Удалить</button>
+                                <button type="button" class="btn btn-sm btn-secondary" @onclick="@(() => Edit(p.Id))">Изменить</button>
+                                <button type="button" class="btn btn-sm btn-danger" @onclick="@(() => Delete(p.Id))">Удалить</button>
                             </td>
                         }
                     </tr>

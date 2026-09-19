@@ -8,24 +8,24 @@
         <h3>♿ Город без барьеров</h3>
         <p class="muted">Войдите в систему</p>
         <div class="field">
-            <label class="form-label">Логин:</label>
-            <input @bind="login" @bind:event="oninput" class="form-control" autocomplete="username" />
+            <label class="form-label" for="login-name">Логин:</label>
+            <input id="login-name" @bind="login" @bind:event="oninput" class="form-control" autocomplete="username" required />
         </div>
         <div class="field">
-            <label class="form-label">Пароль:</label>
+            <label class="form-label" for="login-password">Пароль:</label>
             <div class="password-field">
-                <input type="@(showPassword ? "text" : "password")" @bind="password" @bind:event="oninput" class="form-control" autocomplete="current-password" />
-                <button type="button" class="password-eye" @onclick="@(() => showPassword = !showPassword)" title="Показать/скрыть пароль">@(showPassword ? "🙈" : "👁️")</button>
+                <input id="login-password" type="@(showPassword ? "text" : "password")" @bind="password" @bind:event="oninput" class="form-control" autocomplete="current-password" required />
+                <button type="button" class="password-eye" aria-label="@(showPassword ? "Скрыть пароль" : "Показать пароль")" aria-pressed="@showPassword" @onclick="@(() => showPassword = !showPassword)" title="Показать или скрыть пароль">@(showPassword ? "🙈" : "👁️")</button>
             </div>
         </div>
         <div class="field">
-            <label class="form-label">Проверка (капча): <b>@captchaQuestion</b></label>
-            <input @bind="captchaAnswer" @bind:event="oninput" class="form-control" placeholder="Введите ответ" />
+            <label class="form-label" for="captcha-answer">Проверка: <b>@captchaQuestion</b></label>
+            <input id="captcha-answer" @bind="captchaAnswer" @bind:event="oninput" class="form-control" inputmode="numeric" autocomplete="off" placeholder="Введите ответ" required />
         </div>
-        <button class="btn btn-primary" disabled="@(isLoggingIn || string.IsNullOrWhiteSpace(captchaToken))" @onclick="DoLogin">@(isLoggingIn ? "Входим..." : "Войти")</button>
+        <button type="button" class="btn btn-primary" disabled="@(isLoggingIn || string.IsNullOrWhiteSpace(captchaToken))" @onclick="DoLogin">@(isLoggingIn ? "Входим..." : "Войти")</button>
         @if (!string.IsNullOrEmpty(error))
         {
-            <div class="alert alert-danger">@error</div>
+            <div class="alert alert-danger" role="alert" aria-live="assertive">@error</div>
         }
     </div>
 </div>

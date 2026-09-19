@@ -8,15 +8,20 @@ public class PlacemarkModel
     public int Id { get; set; }
 
     [Required(ErrorMessage = "Укажите название")]
+    [MaxLength(160, ErrorMessage = "Название не должно превышать 160 символов")]
     public string Name { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Укажите адрес")]
+    [MaxLength(300, ErrorMessage = "Адрес не должен превышать 300 символов")]
     public string Address { get; set; } = string.Empty;
 
+    [Range(-90, 90, ErrorMessage = "Некорректная широта")]
     public double Latitude { get; set; }
+    [Range(-180, 180, ErrorMessage = "Некорректная долгота")]
     public double Longitude { get; set; }
 
     [Required(ErrorMessage = "Выберите категорию")]
+    [MaxLength(80)]
     public string Category { get; set; } = string.Empty;
 
     [Range(0, 3)]
@@ -50,9 +55,12 @@ public class PlacemarkModel
         _ => "Недоступно"
     };
 
+    [MaxLength(2000, ErrorMessage = "Примечание не должно превышать 2000 символов")]
     public string Notes { get; set; } = string.Empty;
+    [MaxLength(255)]
     public string? PhotoPath { get; set; }
     // Несколько фотографий через ; (до 10). PhotoPath оставлен для совместимости.
+    [MaxLength(3000)]
     public string? PhotoPaths { get; set; }
     public string? CreatedByUserId { get; set; }
     public string? CreatedByFullName { get; set; }

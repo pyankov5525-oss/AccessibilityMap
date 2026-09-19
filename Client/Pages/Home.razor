@@ -6,19 +6,19 @@
 @implements IDisposable
 
 <div class="map-page">
-    <div id="map" class="map"></div>
+    <div id="map" class="map" role="application" aria-label="Интерактивная карта доступности городских объектов"></div>
 
-    <button class="btn btn-primary filter-fab" @onclick="OpenFilters">🔎 Фильтры</button>
+    <button type="button" class="btn btn-primary filter-fab" aria-expanded="@showFilters" aria-controls="map-filter-panel" @onclick="OpenFilters">🔎 Фильтры</button>
     @if (showFilters)
     {
-        <div class="filter-drawer">
-            <div class="detail-head"><h5>Фильтры карты</h5><button class="btn btn-sm btn-secondary" @onclick="@(() => showFilters = false)">×</button></div>
+        <div id="map-filter-panel" class="filter-drawer" role="dialog" aria-label="Фильтры карты">
+            <div class="detail-head"><h5>Фильтры карты</h5><button type="button" class="btn btn-sm btn-secondary icon-button" aria-label="Закрыть фильтры" @onclick="@(() => showFilters = false)">×</button></div>
             <p class="muted">Доступность</p>
             <div class="filter-group">
-                <button class="chip @(currentFilter == "all" ? "chip-active" : "")" @onclick="SetFilterAll">🌐 Все</button>
-                <button class="chip chip-green @(currentFilter == "green" ? "chip-active" : "")" @onclick="SetFilterGreen">🟢 Доступно</button>
-                <button class="chip chip-gold @(currentFilter == "gold" ? "chip-active" : "")" @onclick="SetFilterGold">🟡 Частично</button>
-                <button class="chip chip-red @(currentFilter == "red" ? "chip-active" : "")" @onclick="SetFilterRed">🔴 Недоступно</button>
+                <button type="button" class="chip @(currentFilter == "all" ? "chip-active" : "")" @onclick="SetFilterAll">🌐 Все</button>
+                <button type="button" class="chip chip-green @(currentFilter == "green" ? "chip-active" : "")" @onclick="SetFilterGreen">🟢 Доступно</button>
+                <button type="button" class="chip chip-gold @(currentFilter == "gold" ? "chip-active" : "")" @onclick="SetFilterGold">🟡 Частично</button>
+                <button type="button" class="chip chip-red @(currentFilter == "red" ? "chip-active" : "")" @onclick="SetFilterRed">🔴 Недоступно</button>
             </div>
             <p class="muted" style="margin-top:10px;">Категории</p>
             @foreach (var cat in CategoryOptions)
@@ -28,8 +28,8 @@
                 </label>
             }
             <div class="form-actions" style="margin-top:10px;">
-                <button class="btn btn-success" @onclick="ApplyFilters">Применить</button>
-                <button class="btn btn-secondary" @onclick="ResetFilters">Сбросить</button>
+                <button type="button" class="btn btn-success" @onclick="ApplyFilters">Применить</button>
+                <button type="button" class="btn btn-secondary" @onclick="ResetFilters">Сбросить</button>
             </div>
         </div>
     }
@@ -54,7 +54,7 @@
             <div class="form-card map-form-card">
                 <div class="form-head">
                     <h5 class="form-title">@(editingId.HasValue ? "Редактировать объект" : "Добавить объект")</h5>
-                    <button type="button" class="form-close" @onclick="CloseForm">×</button>
+                    <button type="button" class="form-close" aria-label="Закрыть форму" @onclick="CloseForm">×</button>
                 </div>
 
                 <div class="field">
@@ -92,13 +92,13 @@
 
                 <div class="field">
                     <label class="form-label">Фотография:</label>
-                    <InputFile OnChange="OnFileSelected" accept="image/*" multiple />
+                    <InputFile OnChange="OnFileSelected" accept="image/jpeg,image/png,image/gif,image/webp" multiple aria-label="Выберите фотографии объекта" />
                     @if (PhotoList.Count > 0)
                     {
                         <div class="photo-list">
                             @foreach (var ph in PhotoList)
                             {
-                                <div class="photo-chip"><img src="/api/photos/@ph" /><button type="button" @onclick="() => RemovePhoto(ph)">×</button></div>
+                                <div class="photo-chip"><img src="/api/photos/@ph" alt="Загруженная фотография объекта" loading="lazy" /><button type="button" aria-label="Удалить фотографию" @onclick="() => RemovePhoto(ph)">×</button></div>
                             }
                         </div>
                     }
@@ -110,8 +110,8 @@
                 </div>
 
                 <div class="form-actions">
-                    <button class="btn btn-success" @onclick="AddPlacemark">@(editingId.HasValue ? "Сохранить" : "Добавить")</button>
-                    <button class="btn btn-secondary" @onclick="CloseForm">Отмена</button>
+                    <button type="button" class="btn btn-success" @onclick="AddPlacemark">@(editingId.HasValue ? "Сохранить" : "Добавить")</button>
+                    <button type="button" class="btn btn-secondary" @onclick="CloseForm">Отмена</button>
                 </div>
 
                 @if (!string.IsNullOrEmpty(message))

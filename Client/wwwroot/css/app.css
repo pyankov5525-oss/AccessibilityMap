@@ -1782,3 +1782,383 @@ body.theme-dark .level-red {
     transform: translateY(-28px) !important;
   }
 }
+
+/* ============================================================
+   ФИНАЛЬНЫЙ СЛОЙ ДОСТУПНОСТИ И АДАПТИВНОСТИ (2026)
+   Единая шкала пользователя: 12 / 14 / 18 px. Этот блок намеренно
+   расположен последним: он нормализует накопившиеся точечные overrides.
+   ============================================================ */
+:root {
+  --ui-font-size: 14px;
+  --ui-line-height: 1.5;
+  --control-height: 40px;
+  --focus-ring: 0 0 0 3px rgba(37, 99, 235, .38);
+}
+
+body.font-small { --ui-font-size: 12px; font-size: 12px !important; }
+body.font-medium { --ui-font-size: 14px; font-size: 14px !important; }
+body.font-large { --ui-font-size: 18px; font-size: 18px !important; }
+
+html { font-size: var(--ui-font-size); }
+body {
+  font-size: var(--ui-font-size) !important;
+  line-height: var(--ui-line-height);
+  text-rendering: optimizeLegibility;
+  -webkit-text-size-adjust: 100%;
+}
+
+p, li, td, th, label, input, select, textarea, button,
+.btn, .btn-sm, .form-control, .form-label, .muted, .nav-link,
+.chip, .subtab, .score-btn, .level-badge, .alert,
+.map-info-panel, .map-info-scores, .map-info-notes, .map-info-btn,
+.filter-title, .ui-control-label, .font-btn {
+  font-size: var(--ui-font-size) !important;
+}
+
+h1 { font-size: clamp(1.75rem, 4vw, 2.25rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 1.9rem); }
+h3 { font-size: clamp(1.3rem, 2.5vw, 1.65rem); }
+h4 { font-size: 1.3rem; }
+h5 { font-size: 1.15rem; }
+h6 { font-size: 1rem; }
+
+/* Управление с клавиатуры и предсказуемые интерактивные элементы */
+a, button, input, select, textarea, [tabindex] { outline: none; }
+a:focus-visible, button:focus-visible, input:focus-visible,
+select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+  box-shadow: var(--focus-ring) !important;
+  outline: 2px solid transparent !important;
+}
+button, .btn, .chip, .subtab, .score-btn, .theme-btn, .font-btn {
+  touch-action: manipulation;
+}
+.btn, .form-control, .score-btn {
+  min-height: var(--control-height);
+  line-height: 1.25;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .35rem;
+  border-radius: 8px;
+  padding: .55rem .85rem;
+}
+.btn:disabled, button:disabled {
+  cursor: not-allowed;
+  opacity: .62;
+}
+.icon-button, .form-close, .map-info-close {
+  width: var(--control-height) !important;
+  min-width: var(--control-height) !important;
+  height: var(--control-height) !important;
+  min-height: var(--control-height) !important;
+  padding: 0 !important;
+  font-size: 1.4rem !important;
+}
+.form-control { padding: .55rem .7rem !important; }
+textarea.form-control { min-height: 88px; resize: vertical; }
+.form-label, .criteria-title, .muted { line-height: 1.45; }
+.form-label { font-weight: 650; }
+
+/* Читаемая типографика во всех трёх режимах */
+body.font-small .brand { font-size: 14px !important; }
+body.font-medium .brand { font-size: 16px !important; }
+body.font-large .brand { font-size: 20px !important; }
+body.font-small .stat b { font-size: 14px !important; }
+body.font-medium .stat b { font-size: 16px !important; }
+body.font-large .stat b { font-size: 20px !important; }
+.stat span { font-size: max(12px, .86em) !important; }
+.map-info-panel h4 { font-size: 1.3rem !important; }
+
+/* Переключатели не меняют геометрию при выборе размера */
+.theme-btn, .font-btn {
+  min-width: 42px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 4px 8px !important;
+}
+.theme-btn { font-size: 18px !important; }
+.font-btn { font-size: 12px !important; }
+.ui-control-label { font-size: 12px !important; }
+.theme-switch, .font-switch { min-height: 42px !important; }
+
+/* Доступная ссылка пропуска навигации */
+.skip-link {
+  position: fixed;
+  z-index: 100000;
+  top: 8px;
+  left: 8px;
+  transform: translateY(-160%);
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #fff;
+  color: #111 !important;
+  font-weight: 700;
+  text-decoration: none;
+}
+.skip-link:focus { transform: translateY(0); }
+
+/* Карточки, таблицы и медиа не выходят за контейнер */
+img { max-width: 100%; height: auto; }
+.page { width: 100%; padding: 12px; }
+.places-table { table-layout: auto; }
+.places-table th, .places-table td {
+  font-size: var(--ui-font-size) !important;
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+.row-actions { flex-wrap: wrap; min-width: 150px; }
+.attachment-photos img { width: auto; height: 96px; object-fit: cover; }
+
+/* Карта: элементы остаются читаемыми, форма прокручивается */
+.map-form-overlay { width: min(420px, 100%) !important; }
+.map-form-overlay .form-card { overflow-y: auto; }
+.map-form-overlay .form-control { min-height: var(--control-height) !important; }
+.score-btn { min-height: var(--control-height) !important; padding: 5px !important; }
+.filter-drawer { width: min(360px, calc(100vw - 24px)); }
+.filter-fab { min-height: 44px; }
+.map-stats .stat { min-width: 58px; }
+.map-stats .stat span { white-space: normal; text-align: center; }
+.map-banner, .map-hint { font-size: var(--ui-font-size) !important; }
+
+/* Пароль: кнопка не уменьшает область нажатия */
+.password-field .form-control { padding-right: 50px !important; }
+.password-eye {
+  width: 40px !important;
+  min-width: 40px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  font-size: 18px !important;
+}
+
+/* Контраст в светлой и тёмной теме */
+body.theme-light .btn-success { background: #15803d !important; border-color: #15803d !important; color: #fff !important; }
+body.theme-light .btn-danger { background: #b91c1c !important; border-color: #b91c1c !important; color: #fff !important; }
+body.theme-light .btn-primary { background: #1d4ed8 !important; border-color: #1d4ed8 !important; color: #fff !important; }
+body.theme-dark .btn-success { color: #071b0e !important; }
+body.theme-dark .level-gold { color: #fff3b0; }
+
+/* Системная настройка уменьшения движения */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+/* Планшет */
+@media (max-width: 900px) {
+  .about-grid { grid-template-columns: 1fr; }
+  .profile-full { grid-template-columns: 1fr !important; }
+  .map-form-overlay { width: 100% !important; max-width: 100% !important; }
+}
+
+/* Телефон: сохраняем горизонтальную навигацию, но не уменьшаем текст ниже 12px */
+@media (max-width: 760px) {
+  :root { --control-height: 40px; }
+
+  .topbar {
+    display: grid !important;
+    grid-template-columns: minmax(94px, auto) minmax(0, 1fr) auto !important;
+    grid-template-areas: "brand nav user" "ui ui ui" !important;
+    gap: 6px !important;
+    padding: 6px !important;
+    overflow: visible !important;
+  }
+  .brand {
+    grid-area: brand !important;
+    max-width: 132px !important;
+    font-size: max(13px, var(--ui-font-size)) !important;
+  }
+  .nav-links {
+    grid-area: nav !important;
+    min-width: 0 !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    flex-wrap: nowrap !important;
+    scrollbar-width: thin !important;
+    padding: 2px !important;
+  }
+  .nav-link {
+    flex: 0 0 auto !important;
+    min-height: 40px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    padding: 7px 9px !important;
+    font-size: var(--ui-font-size) !important;
+  }
+  .user-box, .user-box-near-tabs {
+    grid-area: user !important;
+    max-width: 110px !important;
+    gap: 4px !important;
+  }
+  .user-box .muted, .guest-label {
+    font-size: 12px !important;
+    max-width: 74px !important;
+  }
+  .user-box .btn {
+    min-width: 40px !important;
+    min-height: 40px !important;
+    padding: 5px 7px !important;
+    font-size: 12px !important;
+  }
+  .ui-controls {
+    grid-area: ui !important;
+    width: 100% !important;
+    justify-content: flex-end !important;
+    gap: 8px !important;
+  }
+  .ui-control-label { display: none !important; }
+  .theme-switch, .font-switch { min-height: 40px !important; }
+  .theme-btn, .font-btn {
+    min-width: 40px !important;
+    width: auto !important;
+    height: 36px !important;
+    min-height: 36px !important;
+    font-size: 12px !important;
+  }
+  .theme-btn { font-size: 17px !important; }
+
+  .app-main { padding: 0 !important; }
+  .page { padding: 10px; overflow-x: hidden; }
+  .map-page {
+    height: calc(100dvh - 106px) !important;
+    min-height: 430px !important;
+  }
+  .map { border-radius: 0 !important; }
+
+  /* Форма становится нижней полноширинной панелью и не перекрывает всю карту */
+  .map-form-overlay {
+    top: auto !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: min(78dvh, 720px) !important;
+    max-width: none !important;
+    padding: 6px !important;
+    background: rgba(15, 20, 25, .72) !important;
+  }
+  .map-form-overlay .form-card {
+    height: 100% !important;
+    max-height: none !important;
+    padding: 12px !important;
+  }
+
+  .filter-drawer {
+    position: absolute !important;
+    right: 6px !important;
+    left: 6px !important;
+    bottom: 56px !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: 64dvh !important;
+  }
+  .filter-fab {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+    right: 8px !important;
+    bottom: 8px !important;
+    font-size: 0 !important;
+  }
+  .filter-fab::before { font-size: 22px !important; }
+
+  .map-stats, .map-stats.map-stats-guest, .map-stats.map-stats-auth {
+    display: flex !important;
+    width: auto !important;
+    max-width: calc(100vw - 72px) !important;
+    left: 6px !important;
+    bottom: 8px !important;
+    gap: 4px !important;
+    overflow-x: auto !important;
+    padding: 4px !important;
+  }
+  .map-stats .stat {
+    flex: 0 0 auto !important;
+    min-width: 56px !important;
+    padding: 4px !important;
+  }
+  .map-stats .stat b { font-size: max(14px, var(--ui-font-size)) !important; }
+  .map-stats .stat span { font-size: 12px !important; }
+
+  #customSearchInput {
+    width: min(44vw, 210px) !important;
+    height: 40px !important;
+    font-size: 12px !important;
+  }
+  #customSearchBtn {
+    width: 40px !important;
+    min-width: 40px !important;
+    height: 40px !important;
+    font-size: 14px !important;
+  }
+  #customSearchSuggest {
+    width: min(280px, calc(100vw - 20px)) !important;
+    font-size: 12px !important;
+  }
+  #mapModeSwitcher {
+    transform: translateY(-8px) !important;
+    max-width: min(260px, calc(100vw - 112px)) !important;
+  }
+  #mapModeSwitcher button {
+    min-height: 36px !important;
+    min-width: 60px !important;
+    max-width: 92px !important;
+    padding: 6px !important;
+    font-size: 12px !important;
+  }
+
+  .map-info-panel {
+    top: 112px !important;
+    left: 6px !important;
+    width: calc(100vw - 12px) !important;
+    max-width: none !important;
+    max-height: calc(100dvh - 126px) !important;
+    font-size: var(--ui-font-size) !important;
+  }
+  body.font-large .map-info-panel,
+  body.font-large .map-info-scores,
+  body.font-large .map-info-notes,
+  body.font-large .map-info-btn {
+    font-size: 18px !important;
+  }
+  body.font-large .map-info-panel h4 { font-size: 22px !important; }
+
+  .places-table {
+    display: block !important;
+    width: 100% !important;
+    overflow-x: auto !important;
+    white-space: normal !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .places-table th, .places-table td {
+    min-width: 112px;
+    padding: 9px !important;
+    font-size: var(--ui-font-size) !important;
+  }
+  .places-table th:first-child,
+  .places-table td:first-child { min-width: 48px; }
+  .row-actions { min-width: 170px; }
+
+  .form-actions { flex-wrap: wrap; }
+  .form-actions .btn { flex: 1 1 120px; }
+  .login-page { padding: 12px !important; min-height: calc(100dvh - 106px) !important; }
+  .login-card { width: min(100%, 420px) !important; padding: 20px !important; }
+  .modal-card-custom { width: calc(100vw - 20px); max-height: 88dvh; }
+  .attachments-grid { grid-template-columns: 1fr; }
+}
+
+/* Очень узкие телефоны */
+@media (max-width: 380px) {
+  .topbar { grid-template-columns: 90px minmax(0, 1fr) auto !important; }
+  .brand { max-width: 90px !important; }
+  .user-box .muted, .guest-label { display: none !important; }
+  .theme-btn, .font-btn { min-width: 36px !important; padding: 3px 5px !important; }
+  .map-page { height: calc(100dvh - 104px) !important; }
+  .map-stats { max-width: calc(100vw - 66px) !important; }
+}

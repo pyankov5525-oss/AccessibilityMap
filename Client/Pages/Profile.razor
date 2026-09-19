@@ -56,7 +56,7 @@ else
         </div>
         @if (canEditProfile)
         {
-            <button class="btn btn-success" @onclick="Save">Сохранить</button>
+            <button type="button" class="btn btn-success" @onclick="Save">Сохранить</button>
         }
 
         @if (!isOtherProfile)
@@ -75,7 +75,7 @@ else
             <label class="form-label">Повторите новый пароль</label>
             <input type="password" @bind="newPwd2" @bind:event="oninput" class="form-control" />
         </div>
-        <button class="btn btn-warning" @onclick="ChangePassword">Сменить пароль</button>
+        <button type="button" class="btn btn-warning" @onclick="ChangePassword">Сменить пароль</button>
         }
 
         @if (!string.IsNullOrEmpty(message))

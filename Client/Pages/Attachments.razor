@@ -21,10 +21,10 @@ else
             <div class="attachment-photos">
                 @foreach (var ph in a.Photos)
                 {
-                    <a href="@ph" target="_blank"><img src="@ph" /></a>
+                    <a href="@ph" target="_blank" rel="noopener noreferrer"><img src="@ph" alt="Фотография объекта @a.Name" loading="lazy" /></a>
                 }
             </div>
-            <button class="btn btn-sm btn-secondary" style="margin-top:8px" @onclick='() => Nav.NavigateTo("/?focus=" + a.Id)'>Перейти к метке</button>
+            <button type="button" class="btn btn-sm btn-secondary" style="margin-top:8px" @onclick='() => Nav.NavigateTo("/?focus=" + a.Id)'>Перейти к метке</button>
         </div>
     }
     </div>

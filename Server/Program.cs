@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.HttpOverrides;
 using Npgsql;
 using System.IO;
 using System.Linq;
@@ -39,18 +40,35 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Identity (роли: Developer / Manager / Volunteer)
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
-    options.Password.RequireDigit = false;
-    options.Password.RequireLowercase = false;
+    options.Password.RequireDigit = true;
+    options.Password.RequireLowercase = true;
     options.Password.RequireUppercase = false;
     options.Password.RequireNonAlphanumeric = false;
-    options.Password.RequiredLength = 6;
+    options.Password.RequiredLength = 10;
+    options.Password.RequiredUniqueChars = 4;
     options.User.RequireUniqueEmail = false;
+    options.Lockout.AllowedForNewUsers = true;
+    options.Lockout.MaxFailedAccessAttempts = 5;
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
 })
 .AddEntityFrameworkStores<AppDbContext>()
 .AddDefaultTokenProviders();
 
-// JWT (логин/пароль генерируются, пароли хешируются)
-var jwtKey = builder.Configuration["Jwt:Key"] ?? "accessibility-map-dev-secret-key-1234567890";
+// JWT. В production секрет обязателен и задаётся только через Jwt__Key/секреты хостинга.
+// Локальный ключ разрешён исключительно в Development, чтобы проект можно было запустить без платных сервисов.
+var jwtKey = builder.Configuration["Jwt:Key"];
+if (string.IsNullOrWhiteSpace(jwtKey))
+{
+    if (!builder.Environment.IsDevelopment())
+        throw new InvalidOperationException("Не задан Jwt__Key. Укажите случайный секрет длиной не менее 32 символов.");
+    jwtKey = "development-only-accessibility-map-key-change-me";
+}
+if (Encoding.UTF8.GetByteCount(jwtKey) < 32)
+    throw new InvalidOperationException("Jwt__Key должен содержать не менее 32 байт.");
+builder.Configuration["Jwt:Key"] = jwtKey;
+
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "AccessibilityMap";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "AccessibilityMap.Client";
 builder.Services.AddAuthentication(options =>
     {
         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -60,10 +78,15 @@ builder.Services.AddAuthentication(options =>
     })
     .AddJwtBearer(options =>
     {
+        options.MapInboundClaims = true;
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidateIssuer = false,
-            ValidateAudience = false,
+            ValidateIssuer = true,
+            ValidIssuer = jwtIssuer,
+            ValidateAudience = true,
+            ValidAudience = jwtAudience,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(1),
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
         };
@@ -73,14 +96,28 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHttpClient();
+builder.Services.AddHealthChecks();
+builder.Services.AddResponseCompression(options => options.EnableForHttps = true);
 builder.Services.AddHostedService<PlacemarkCleanupService>();
 
+// Hosted WASM обращается к API с того же origin. Дополнительные origin разрешаются
+// явным списком CORS_ORIGINS (через запятую), а не небезопасным AllowAnyOrigin.
+var corsOrigins = (Environment.GetEnvironmentVariable("CORS_ORIGINS") ?? string.Empty)
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+        if (corsOrigins.Length > 0)
+            policy.WithOrigins(corsOrigins).AllowAnyHeader().AllowAnyMethod();
     });
+});
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    // Заголовки принимаются только от прокси, добавленных хостингом в KnownProxies/KnownNetworks.
+    options.ForwardLimit = 1;
 });
 
 // На хостинге (Render/Azure) порт задаётся переменной окружения PORT / WEBSITES_PORT
@@ -98,13 +135,43 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseForwardedHeaders();
+app.UseResponseCompression();
+
+// Базовые защитные заголовки. unsafe-inline/unsafe-eval пока нужны Яндекс.Картам 2.1
+// и существующему JS-интеропу; после перехода на Maps 3.0 политику можно ужесточить.
+app.Use(async (context, next) =>
+{
+    context.Response.OnStarting(() =>
+    {
+        var headers = context.Response.Headers;
+        headers["X-Content-Type-Options"] = "nosniff";
+        headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+        headers["Permissions-Policy"] = "camera=(), microphone=(), payment=(), usb=()";
+        headers["X-Frame-Options"] = "SAMEORIGIN";
+        headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://api-maps.yandex.ru https://*.maps.yandex.ru https://yastatic.net; style-src 'self' 'unsafe-inline' https://*.maps.yandex.ru https://yastatic.net; img-src 'self' data: blob: https://*.maps.yandex.ru https://yastatic.net https://*.yandex.net; connect-src 'self' https://*.yandex.ru https://*.yandex.net; font-src 'self' data: https://yastatic.net; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'";
+        return Task.CompletedTask;
+    });
+    await next();
+});
+
 app.UseCors();
 app.UseMiddleware<RateLimitMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
-//app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+    app.UseHsts();
 app.UseBlazorFrameworkFiles();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = context =>
+    {
+        var path = context.Context.Request.Path.Value ?? string.Empty;
+        if (path.Contains("/_framework/") || path.EndsWith(".css") || path.EndsWith(".js") || path.EndsWith(".svg") || path.EndsWith(".png"))
+            context.Context.Response.Headers["Cache-Control"] = "public,max-age=604800";
+    }
+});
+app.MapHealthChecks("/health");
 app.MapControllers();
 app.MapFallbackToFile("index.html");
 
@@ -199,6 +266,10 @@ static async Task EnsureUserSchemaAsync(AppDbContext db, bool usePostgres)
             await db.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS \"Photos\" (\"Id\" integer GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, \"FileName\" text NOT NULL UNIQUE, \"ContentType\" text NOT NULL, \"Data\" bytea NOT NULL, \"UploadedAt\" timestamp with time zone NOT NULL);");
             await db.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS \"PlacemarkVotes\" (\"Id\" integer GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, \"PlacemarkId\" integer NOT NULL, \"VoterKey\" text NOT NULL, \"Value\" integer NOT NULL, \"CreatedAt\" timestamp with time zone NOT NULL, \"UpdatedAt\" timestamp with time zone NOT NULL);");
             await db.Database.ExecuteSqlRawAsync("CREATE UNIQUE INDEX IF NOT EXISTS \"IX_PlacemarkVotes_PlacemarkId_VoterKey\" ON \"PlacemarkVotes\" (\"PlacemarkId\", \"VoterKey\");");
+            await db.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS \"IX_Placemarks_VerificationStatus\" ON \"Placemarks\" (\"VerificationStatus\");");
+            await db.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS \"IX_Placemarks_Category\" ON \"Placemarks\" (\"Category\");");
+            await db.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS \"IX_Placemarks_Latitude_Longitude\" ON \"Placemarks\" (\"Latitude\", \"Longitude\");");
+            await db.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS \"IX_ActivityLogs_Timestamp\" ON \"ActivityLogs\" (\"Timestamp\");");
         }
         else
         {
@@ -216,6 +287,7 @@ static async Task EnsureUserSchemaAsync(AppDbContext db, bool usePostgres)
             db.Database.ExecuteSqlRaw("CREATE UNIQUE INDEX IF NOT EXISTS IX_PlacemarkVotes_PlacemarkId_VoterKey ON PlacemarkVotes (PlacemarkId, VoterKey);");
             db.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_Placemarks_VerificationStatus ON Placemarks (VerificationStatus);");
             db.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_Placemarks_Category ON Placemarks (Category);");
+            db.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_Placemarks_Latitude_Longitude ON Placemarks (Latitude, Longitude);");
             db.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_ActivityLogs_UserName ON ActivityLogs (UserName);");
             db.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_ActivityLogs_Timestamp ON ActivityLogs (Timestamp);");
         }

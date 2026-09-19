@@ -21,7 +21,14 @@ public class AuthState
     {
         try
         {
-            var json = await _js.InvokeAsync<string>("localStorage.getItem", "am_auth");
+            // Токен живёт только в пределах вкладки браузера. Это не делает его
+            // неуязвимым для XSS, но не оставляет многодневную сессию в localStorage.
+            var json = await _js.InvokeAsync<string>("sessionStorage.getItem", "am_auth");
+            if (string.IsNullOrEmpty(json) || json == "null")
+            {
+                // Однократная очистка старого формата хранения после обновления.
+                await _js.InvokeVoidAsync("localStorage.removeItem", "am_auth");
+            }
             if (!string.IsNullOrEmpty(json) && json != "null")
             {
                 var data = JsonSerializer.Deserialize<AuthData>(json);
@@ -47,7 +54,7 @@ public class AuthState
         try
         {
             var json = JsonSerializer.Serialize(new AuthData { Token = token, UserName = userName, Role = role, ProfileComplete = profileComplete });
-            await _js.InvokeVoidAsync("localStorage.setItem", "am_auth", json);
+            await _js.InvokeVoidAsync("sessionStorage.setItem", "am_auth", json);
         }
         catch { }
         OnChange?.Invoke();
@@ -68,7 +75,12 @@ public class AuthState
         UserName = "";
         Role = "";
         ProfileComplete = true;
-        try { await _js.InvokeVoidAsync("localStorage.removeItem", "am_auth"); } catch { }
+        try
+        {
+            await _js.InvokeVoidAsync("sessionStorage.removeItem", "am_auth");
+            await _js.InvokeVoidAsync("localStorage.removeItem", "am_auth");
+        }
+        catch { }
         OnChange?.Invoke();
     }
 

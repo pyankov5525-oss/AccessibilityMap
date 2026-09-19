@@ -2,9 +2,10 @@
 @inject AccessibilityMap.Services.AuthState Auth
 @implements IDisposable
 
+<a class="skip-link" href="#main-content">Перейти к основному содержимому</a>
 <div class="app-shell">
     <NavMenu />
-    <main class="app-main">
+    <main id="main-content" class="app-main" tabindex="-1">
         @Body
     </main>
 </div>

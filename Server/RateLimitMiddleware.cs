@@ -15,8 +15,12 @@ public class RateLimitMiddleware
     private static readonly Dictionary<string, int> Limits = new()
     {
         { "/api/auth/login", 10 },
+        { "/api/auth/captcha", 30 },
+        { "/api/auth/register", 10 },
         { "/api/placemarks/geocode", 30 },
+        { "/api/placemarks/reverse-geocode", 30 },
         { "/api/placemarks/suggest", 60 },
+        { "/api/photos", 20 },
         { "/api/placemarks", 20 }, // POST — добавление метки
     };
 
@@ -62,12 +66,8 @@ public class RateLimitMiddleware
 
     private static string GetClientIp(HttpContext context)
     {
-        var fwd = context.Request.Headers["X-Forwarded-For"].ToString();
-        if (!string.IsNullOrEmpty(fwd))
-        {
-            var first = fwd.Split(',')[0].Trim();
-            if (!string.IsNullOrEmpty(first)) return first;
-        }
+        // ForwardedHeadersMiddleware уже подменяет RemoteIpAddress, но только для
+        // доверенного прокси. Напрямую X-Forwarded-For не читаем: его легко подделать.
         return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
     }
 }
