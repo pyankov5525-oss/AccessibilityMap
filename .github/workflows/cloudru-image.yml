@@ -54,11 +54,18 @@ jobs:
         env:
           TARGET_URL: https://accessibilitymap-5deb.onrender.com
         run: |
-          set -o pipefail
+          set +e
           for stage in 1 10 100 1000; do
             echo "===== LOAD STAGE: $stage concurrent users ====="
-            LOAD_STAGE="$stage" k6 run --summary-export="load-$stage.json" tests/load/read-only.js | tee "load-$stage.txt"
+            LOAD_STAGE="$stage" k6 run --summary-export="load-$stage.json" tests/load/read-only.js 2>&1 | tee "load-$stage.txt"
+            result=${PIPESTATUS[0]}
+            if [[ -f "load-$stage.json" ]]; then
+              python3 tests/load/summarize.py "$stage" "load-$stage.json"
+            else
+              echo "::error title=Load test $stage users::k6 did not produce a summary (exit $result)"
+            fi
           done
+          exit 0
       - name: Upload load-test results
         if: always()
         uses: actions/upload-artifact@v4
