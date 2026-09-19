@@ -36,3 +36,33 @@ jobs:
             ${{ steps.image.outputs.name }}:cloudru-demo
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  authorized-load-test:
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[load-test]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install k6
+        run: |
+          curl -fsSL https://github.com/grafana/k6/releases/download/v2.2.0/k6-v2.2.0-linux-amd64.tar.gz -o /tmp/k6.tgz
+          tar -xzf /tmp/k6.tgz -C /tmp
+          sudo install /tmp/k6-v2.2.0-linux-amd64/k6 /usr/local/bin/k6
+      - name: Warm up authorized Render service
+        run: curl --fail --show-error --silent --retry 5 --retry-all-errors --retry-delay 10 --max-time 120 https://accessibilitymap-5deb.onrender.com/health
+      - name: Run staged read-only test (1, 10, 100, 1000)
+        env:
+          TARGET_URL: https://accessibilitymap-5deb.onrender.com
+        run: |
+          set -o pipefail
+          for stage in 1 10 100 1000; do
+            echo "===== LOAD STAGE: $stage concurrent users ====="
+            LOAD_STAGE="$stage" k6 run --summary-export="load-$stage.json" tests/load/read-only.js | tee "load-$stage.txt"
+          done
+      - name: Upload load-test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: authorized-render-load-test-results
+          path: load-*.*
+          retention-days: 14
